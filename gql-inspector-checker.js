@@ -52,14 +52,23 @@ const ENTITY_SHARE_FILTER_RETYPE =
 const NULLABLE_MUTATION_PAYLOAD =
   "The payload became nullable so a failed mutation leaves the other fields of the response. It was added in this same unreleased cycle and went out in no release tag.";
 
+const SPEC_INTERFACE_TO_OBJECT =
+  "The interface had no implementor in the schema, so no client could spread a fragment on it; `spec { channelType }` and `strategySpec { strategy }` still work on the object, which now carries the concrete spec as a oneOf-shaped field.";
+
 const ACCEPTED_TYPE_CHANGES = {
+  "DeploymentStrategySpec": SPEC_INTERFACE_TO_OBJECT,
+  "NotificationChannelSpec": SPEC_INTERFACE_TO_OBJECT,
   "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
   "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
 };
 
-const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];
+const TYPE_CHANGES = [
+  "INPUT_FIELD_TYPE_CHANGED",
+  "FIELD_TYPE_CHANGED",
+  "TYPE_KIND_CHANGED",
+];
 
 const REMOVAL_CHANGES = [
   "INPUT_FIELD_REMOVED",
