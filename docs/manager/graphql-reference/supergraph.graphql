@@ -3013,6 +3013,14 @@ input BlueGreenConfigInput
   promoteDelaySeconds: Int! = 0
 }
 
+"""Added in 26.10.0. Blue-green deployment strategy specification."""
+type BlueGreenStrategySpec
+  @join__type(graph: STRAWBERRY)
+{
+  autoPromote: Boolean!
+  promoteDelaySeconds: Int!
+}
+
 """
 Added in 26.4.4. Failure detail for a single permission entry in bulk add
 """
@@ -7781,12 +7789,22 @@ input DeploymentStrategyInput
 }
 
 """
-Added in 25.19.0. Base interface for deployment strategy specifications.
+Added in 25.19.0. Deployment strategy specification. Exactly one of 'rollingUpdate' or 'blueGreen' is non-null, the one matching 'strategy'.
 """
-interface DeploymentStrategySpec
+type DeploymentStrategySpec
   @join__type(graph: STRAWBERRY)
 {
   strategy: DeploymentStrategyType!
+
+  """
+  Added in 26.10.0. Rolling update settings. Non-null for the ROLLING strategy.
+  """
+  rollingUpdate: RollingUpdateStrategySpec
+
+  """
+  Added in 26.10.0. Blue-green settings. Non-null for the BLUE_GREEN strategy.
+  """
+  blueGreen: BlueGreenStrategySpec
 }
 
 """
@@ -8701,6 +8719,20 @@ input EffectiveResourceAllocationV2Input
   resourceGroupName: String!
 }
 
+"""Added in 26.10.0. Email message settings."""
+type EmailMessage
+  @join__type(graph: STRAWBERRY)
+{
+  """Sender email address"""
+  fromEmail: String!
+
+  """List of recipient email addresses"""
+  toEmails: [String!]!
+
+  """Email subject Jinja2 template"""
+  subjectTemplate: String
+}
+
 """Added in 24.09.0. Input for email message settings"""
 input EmailMessageInput
   @join__type(graph: STRAWBERRY)
@@ -8708,6 +8740,20 @@ input EmailMessageInput
   fromEmail: String!
   toEmails: [String!]!
   subjectTemplate: String = null
+}
+
+"""Added in 26.10.0. Specification for email notification channel."""
+type EmailSpec
+  @join__type(graph: STRAWBERRY)
+{
+  """SMTP connection settings"""
+  smtp: SMTPConnection!
+
+  """Email message settings"""
+  message: EmailMessage!
+
+  """SMTP authentication credentials"""
+  auth: SMTPAuth
 }
 
 """Added in 24.09.0. Input for email notification channel configuration"""
@@ -11165,6 +11211,17 @@ input IntFilter
   greaterThanOrEqual: Int = null
   lessThan: Int = null
   lessThanOrEqual: Int = null
+}
+
+"""
+Added in 26.10.0. A rolling-update budget value: either an absolute count or a percentage.
+Exactly one of 'count' or 'percent' is non-null.
+"""
+type IntOrPercent
+  @join__type(graph: STRAWBERRY)
+{
+  count: Int
+  percent: Float
 }
 
 """
@@ -17121,12 +17178,22 @@ enum NotificationChannelOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.3.0. Interface for notification channel specifications."""
-interface NotificationChannelSpec
+"""
+Added in 26.3.0. Notification channel specification. Exactly one of 'webhook' or 'email' is non-null, the one matching 'channelType'.
+"""
+type NotificationChannelSpec
   @join__type(graph: STRAWBERRY)
 {
   """Channel type discriminator"""
   channelType: NotificationChannelType!
+
+  """
+  Added in 26.10.0. Webhook specification. Non-null for a webhook channel.
+  """
+  webhook: WebhookSpec
+
+  """Added in 26.10.0. Email specification. Non-null for an email channel."""
+  email: EmailSpec
 }
 
 """
@@ -25891,6 +25958,14 @@ input RollingUpdateConfigInput
   maxUnavailable: IntOrPercentInput
 }
 
+"""Added in 26.10.0. Rolling update strategy specification."""
+type RollingUpdateStrategySpec
+  @join__type(graph: STRAWBERRY)
+{
+  maxSurge: IntOrPercent!
+  maxUnavailable: IntOrPercent!
+}
+
 """Added in 25.19.0. Represents a route for a model deployment."""
 type Route implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -28450,12 +28525,37 @@ type SliderOption
   step: Float!
 }
 
+"""Added in 26.10.0. SMTP authentication credentials."""
+type SMTPAuth
+  @join__type(graph: STRAWBERRY)
+{
+  """SMTP auth username (password is never exposed)"""
+  username: String
+}
+
 """Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput
   @join__type(graph: STRAWBERRY)
 {
   username: String = null
   password: String = null
+}
+
+"""Added in 26.10.0. SMTP server connection settings."""
+type SMTPConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """SMTP server host"""
+  host: String!
+
+  """SMTP server port"""
+  port: Int!
+
+  """Whether TLS is enabled for SMTP connection"""
+  useTls: Boolean!
+
+  """SMTP connection timeout in seconds"""
+  timeout: Int!
 }
 
 """Added in 24.09.0. Input for SMTP server connection settings"""
@@ -33568,6 +33668,14 @@ type VirtualFolderPermissionList implements PaginatedList
 {
   items: [VirtualFolderPermission]!
   total_count: Int!
+}
+
+"""Added in 26.10.0. Specification for webhook notification channel."""
+type WebhookSpec
+  @join__type(graph: STRAWBERRY)
+{
+  """Webhook endpoint URL"""
+  url: String!
 }
 
 """Added in 24.09.0. Input for webhook configuration"""

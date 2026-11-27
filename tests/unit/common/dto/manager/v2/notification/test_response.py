@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailMessageInfo,
     EmailSpecInfo,
+    NotificationChannelSpecInfo,
     NotificationChannelTypeDTO,
     NotificationRuleTypeDTO,
     SMTPConnectionInfo,
@@ -32,31 +33,35 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
-def _make_webhook_spec_info() -> WebhookSpecInfo:
-    return WebhookSpecInfo(
+def _make_webhook_spec_info(
+    url: str = "https://example.com/webhook",
+) -> NotificationChannelSpecInfo:
+    return NotificationChannelSpecInfo(
         channel_type=NotificationChannelTypeDTO.WEBHOOK,
-        url="https://example.com/webhook",
+        webhook=WebhookSpecInfo(url=url),
     )
 
 
-def _make_email_spec_info() -> EmailSpecInfo:
-    return EmailSpecInfo(
+def _make_email_spec_info() -> NotificationChannelSpecInfo:
+    return NotificationChannelSpecInfo(
         channel_type=NotificationChannelTypeDTO.EMAIL,
-        smtp=SMTPConnectionInfo(
-            host="smtp.example.com",
-            port=587,
-            use_tls=True,
-            timeout=30,
-        ),
-        message=EmailMessageInfo(
-            from_email="noreply@example.com",
-            to_emails=["admin@example.com"],
+        email=EmailSpecInfo(
+            smtp=SMTPConnectionInfo(
+                host="smtp.example.com",
+                port=587,
+                use_tls=True,
+                timeout=30,
+            ),
+            message=EmailMessageInfo(
+                from_email="noreply@example.com",
+                to_emails=["admin@example.com"],
+            ),
         ),
     )
 
 
 def _make_channel_node(
-    spec: WebhookSpecInfo | EmailSpecInfo | None = None,
+    spec: NotificationChannelSpecInfo | None = None,
     channel_type: NotificationChannelTypeDTO = NotificationChannelTypeDTO.WEBHOOK,
 ) -> NotificationChannelNode:
     now = datetime.now(tz=UTC)
@@ -113,7 +118,8 @@ class TestNotificationChannelNodeCreation:
             updated_at=now,
         )
         assert node.channel_type == NotificationChannelTypeDTO.EMAIL
-        assert isinstance(node.spec, EmailSpecInfo)
+        assert isinstance(node.spec.email, EmailSpecInfo)
+        assert node.spec.webhook is None
 
     def test_description_defaults_to_none(self) -> None:
         node = _make_channel_node()
@@ -136,21 +142,19 @@ class TestNotificationChannelNodeCreation:
         assert node.description is None
 
     def test_spec_webhook_url_accessible(self) -> None:
-        spec = WebhookSpecInfo(
-            channel_type=NotificationChannelTypeDTO.WEBHOOK,
-            url="https://hooks.example.com",
-        )
-        node = _make_channel_node(spec=spec)
-        assert isinstance(node.spec, WebhookSpecInfo)
-        assert node.spec.url == "https://hooks.example.com"
+        node = _make_channel_node(spec=_make_webhook_spec_info("https://hooks.example.com"))
+        assert node.spec.webhook is not None
+        assert node.spec.webhook.url == "https://hooks.example.com"
+        assert node.spec.email is None
 
     def test_spec_email_fields_accessible(self) -> None:
         node = _make_channel_node(
             spec=_make_email_spec_info(),
             channel_type=NotificationChannelTypeDTO.EMAIL,
         )
-        assert isinstance(node.spec, EmailSpecInfo)
-        assert node.spec.smtp.host == "smtp.example.com"
+        assert node.spec.email is not None
+        assert node.spec.email.smtp.host == "smtp.example.com"
+        assert node.spec.webhook is None
 
 
 class TestNotificationChannelNodeSerialization:
@@ -188,15 +192,12 @@ class TestNotificationChannelNodeSerialization:
         assert restored.channel_type == NotificationChannelTypeDTO.EMAIL
 
     def test_nested_spec_preserved_in_round_trip(self) -> None:
-        spec = WebhookSpecInfo(
-            channel_type=NotificationChannelTypeDTO.WEBHOOK,
-            url="https://test.example.com/hook",
-        )
-        node = _make_channel_node(spec=spec)
+        node = _make_channel_node(spec=_make_webhook_spec_info("https://test.example.com/hook"))
         json_str = node.model_dump_json()
         restored = NotificationChannelNode.model_validate_json(json_str)
-        assert isinstance(restored.spec, WebhookSpecInfo)
-        assert restored.spec.url == "https://test.example.com/hook"
+        assert restored.spec.webhook is not None
+        assert restored.spec.webhook.url == "https://test.example.com/hook"
+        assert restored.spec.email is None
 
 
 class TestNotificationRuleNodeCreation:

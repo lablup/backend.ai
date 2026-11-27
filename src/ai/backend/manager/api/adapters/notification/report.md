@@ -253,7 +253,8 @@ Then
   - items[0].description = None
   - items[0].channel_type = 'webhook'
   - items[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - items[0].spec.url = 'https://hooks.example.test/notify'
+  - items[0].spec.email = None
+  - items[0].spec.webhook.url = 'https://hooks.example.test/notify'
   - items[0].enabled = True
   - items[0].created_by: same as the user who created it
   - items[0].created_at: the time this run wrote
@@ -264,7 +265,8 @@ Then
   - items[1].description = None
   - items[1].channel_type = 'webhook'
   - items[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - items[1].spec.url = 'https://hooks.example.test/notify'
+  - items[1].spec.email = None
+  - items[1].spec.webhook.url = 'https://hooks.example.test/notify'
   - items[1].enabled = True
   - items[1].created_by: same as the user who created it
   - items[1].created_at: the time this run wrote
@@ -442,7 +444,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = False
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -477,7 +480,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -512,15 +516,16 @@ Then
   - description = None
   - channel_type = 'email'
   - spec.channel_type = <NotificationChannelTypeDTO.EMAIL: 'email'>
-  - spec.smtp.host = 'smtp.example.test'
-  - spec.smtp.port = 587
-  - spec.smtp.use_tls = True
-  - spec.smtp.timeout = 30
-  - spec.message.from_email = 'noreply@example.test'
-  - spec.message.to_emails = ['ops@example.test']
-  - spec.message.subject_template = None
-  - spec.auth.username = 'mailer'
-  - spec.auth.password: skipped: the response type has no such place
+  - spec.webhook = None
+  - spec.email.smtp.host = 'smtp.example.test'
+  - spec.email.smtp.port = 587
+  - spec.email.smtp.use_tls = True
+  - spec.email.smtp.timeout = 30
+  - spec.email.message.from_email = 'noreply@example.test'
+  - spec.email.message.to_emails = ['ops@example.test']
+  - spec.email.message.subject_template = None
+  - spec.email.auth.username = 'mailer'
+  - spec.email.auth.password: skipped: the response type has no such place
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -820,7 +825,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -1089,7 +1095,8 @@ Then
   - successes[0].description = None
   - successes[0].channel_type = 'webhook'
   - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].spec.email = None
+  - successes[0].spec.webhook.url = 'https://hooks.example.test/notify'
   - successes[0].enabled = True
   - successes[0].created_by: same as the user who created it
   - successes[0].created_at: the time this run wrote
@@ -1100,7 +1107,8 @@ Then
   - successes[1].description = None
   - successes[1].channel_type = 'webhook'
   - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].spec.email = None
+  - successes[1].spec.webhook.url = 'https://hooks.example.test/notify'
   - successes[1].enabled = True
   - successes[1].created_by: same as the user who created it
   - successes[1].created_at: the time this run wrote
@@ -1263,7 +1271,8 @@ Then
   - successes[0].description = 'the description changed all at once'
   - successes[0].channel_type = 'webhook'
   - successes[0].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - successes[0].spec.url = 'https://hooks.example.test/notify'
+  - successes[0].spec.email = None
+  - successes[0].spec.webhook.url = 'https://hooks.example.test/notify'
   - successes[0].enabled = True
   - successes[0].created_by: same as the user who created it
   - successes[0].created_at: the time this run wrote
@@ -1274,7 +1283,8 @@ Then
   - successes[1].description = 'the description changed all at once'
   - successes[1].channel_type = 'webhook'
   - successes[1].spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - successes[1].spec.url = 'https://hooks.example.test/notify'
+  - successes[1].spec.email = None
+  - successes[1].spec.webhook.url = 'https://hooks.example.test/notify'
   - successes[1].enabled = True
   - successes[1].created_by: same as the user who created it
   - successes[1].created_at: the time this run wrote
@@ -2013,7 +2023,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -2049,7 +2060,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/elsewhere'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/elsewhere'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -2085,7 +2097,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -2121,7 +2134,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = False
   - created_by: same as the user who created it
   - created_at: the time this run wrote
@@ -2157,7 +2171,8 @@ Then
   - description = None
   - channel_type = 'webhook'
   - spec.channel_type = <NotificationChannelTypeDTO.WEBHOOK: 'webhook'>
-  - spec.url = 'https://hooks.example.test/notify'
+  - spec.email = None
+  - spec.webhook.url = 'https://hooks.example.test/notify'
   - enabled = True
   - created_by: same as the user who created it
   - created_at: the time this run wrote

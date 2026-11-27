@@ -144,6 +144,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentScope,
     DeploymentStrategyInfoDTO,
+    DeploymentStrategySpecInfo,
     DeploymentUsage,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -2596,18 +2597,22 @@ class DeploymentAdapter(BaseAdapter):
 
     @staticmethod
     def _policy_data_to_dto(data: DeploymentPolicyData) -> DeploymentPolicyNode:
-        strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo
+        strategy_spec: DeploymentStrategySpecInfo
         if isinstance(data.strategy_spec, RollingUpdateSpec):
-            strategy_spec = RollingUpdateStrategySpecInfo(
+            strategy_spec = DeploymentStrategySpecInfo(
                 strategy=data.strategy,
-                max_surge=data.strategy_spec.max_surge,
-                max_unavailable=data.strategy_spec.max_unavailable,
+                rolling_update=RollingUpdateStrategySpecInfo(
+                    max_surge=data.strategy_spec.max_surge,
+                    max_unavailable=data.strategy_spec.max_unavailable,
+                ),
             )
         else:
-            strategy_spec = BlueGreenStrategySpecInfo(
+            strategy_spec = DeploymentStrategySpecInfo(
                 strategy=data.strategy,
-                auto_promote=data.strategy_spec.auto_promote,
-                promote_delay_seconds=data.strategy_spec.promote_delay_seconds,
+                blue_green=BlueGreenStrategySpecInfo(
+                    auto_promote=data.strategy_spec.auto_promote,
+                    promote_delay_seconds=data.strategy_spec.promote_delay_seconds,
+                ),
             )
         return DeploymentPolicyNode(
             id=data.id,

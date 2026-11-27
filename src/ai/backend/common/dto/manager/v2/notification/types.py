@@ -58,18 +58,7 @@ class NotificationRuleOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-class NotificationChannelSpecInfo(BaseResponseModel):
-    """Base class for notification channel spec sub-types.
-
-    Subclassed by WebhookSpecInfo and EmailSpecInfo so that Strawberry's
-    pydantic interface dispatch can resolve the concrete GQL type from the
-    concrete DTO type via NotificationChannelSpecGQL.from_pydantic().
-    """
-
-    channel_type: NotificationChannelTypeDTO = Field(description="Channel type discriminator")
-
-
-class WebhookSpecInfo(NotificationChannelSpecInfo):
+class WebhookSpecInfo(BaseResponseModel):
     """Webhook specification — matches WebhookSpecGQL structure."""
 
     url: str = Field(description="Webhook endpoint URL")
@@ -98,9 +87,25 @@ class SMTPAuthInfo(BaseResponseModel):
     username: str | None = Field(description="SMTP auth username (password is never exposed)")
 
 
-class EmailSpecInfo(NotificationChannelSpecInfo):
+class EmailSpecInfo(BaseResponseModel):
     """Email specification — matches EmailSpecGQL nested structure."""
 
     smtp: SMTPConnectionInfo = Field(description="SMTP connection settings")
     message: EmailMessageInfo = Field(description="Email message settings")
     auth: SMTPAuthInfo | None = Field(default=None, description="SMTP authentication credentials")
+
+
+class NotificationChannelSpecInfo(BaseResponseModel):
+    """Notification channel spec: ``channel_type`` names the one sub-spec that is set.
+
+    Shaped like ``NotificationChannelSpecInputDTO``: exactly one of ``webhook`` or ``email``
+    is non-null, the one matching ``channel_type``.
+    """
+
+    channel_type: NotificationChannelTypeDTO = Field(description="Channel type discriminator")
+    webhook: WebhookSpecInfo | None = Field(
+        default=None, description="Webhook specification, set for a webhook channel"
+    )
+    email: EmailSpecInfo | None = Field(
+        default=None, description="Email specification, set for an email channel"
+    )

@@ -12,10 +12,9 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
-    EmailSpecInfo,
+    NotificationChannelSpecInfo,
     NotificationChannelTypeDTO,
     NotificationRuleTypeDTO,
-    WebhookSpecInfo,
 )
 
 __all__ = (
@@ -48,7 +47,7 @@ class NotificationChannelNode(BaseResponseModel):
     name: str = Field(description="Channel name")
     description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelTypeDTO = Field(description="Channel type")
-    spec: WebhookSpecInfo | EmailSpecInfo = Field(description="Channel specification")
+    spec: NotificationChannelSpecInfo = Field(description="Channel specification")
     enabled: bool = Field(description="Whether the channel is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the channel")

@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import (
     IntOrPercent as IntOrPercentDTO,
 )
@@ -42,7 +43,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_enum,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_interface,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -65,7 +65,7 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.2",
+        added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
             A rolling-update budget value: either an absolute count or a percentage.
             Exactly one of 'count' or 'percent' is non-null.
@@ -98,44 +98,59 @@ class IntOrPercentInputGQL(PydanticInputMixin[IntOrPercentDTO]):
 # ========== Output Types (Response) ==========
 
 
-@gql_pydantic_interface(
-    BackendAIGQLMeta(
-        added_version="25.19.0",
-        description="Base interface for deployment strategy specifications.",
-    ),
-    model=DeploymentStrategySpecInfo,
-    name="DeploymentStrategySpec",
-)
-class DeploymentStrategySpecGQL:
-    strategy: DeploymentStrategyTypeGQL
-
-
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="25.19.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Rolling update strategy specification.",
     ),
     model=RollingUpdateStrategySpecInfo,
     name="RollingUpdateStrategySpec",
 )
-class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
-    strategy: DeploymentStrategyTypeGQL
+class RollingUpdateStrategySpecGQL:
     max_surge: IntOrPercentGQL
     max_unavailable: IntOrPercentGQL
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="25.19.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Blue-green deployment strategy specification.",
     ),
     model=BlueGreenStrategySpecInfo,
     name="BlueGreenStrategySpec",
 )
-class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
-    strategy: DeploymentStrategyTypeGQL
+class BlueGreenStrategySpecGQL:
     auto_promote: bool
     promote_delay_seconds: int
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description=(
+            "Deployment strategy specification. Exactly one of 'rollingUpdate' or 'blueGreen'"
+            " is non-null, the one matching 'strategy'."
+        ),
+    ),
+    model=DeploymentStrategySpecInfo,
+    name="DeploymentStrategySpec",
+)
+class DeploymentStrategySpecGQL:
+    strategy: DeploymentStrategyTypeGQL
+    rolling_update: RollingUpdateStrategySpecGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Rolling update settings. Non-null for the ROLLING strategy.",
+        ),
+        default=None,
+    )
+    blue_green: BlueGreenStrategySpecGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Blue-green settings. Non-null for the BLUE_GREEN strategy.",
+        ),
+        default=None,
+    )
 
 
 @gql_node_type(

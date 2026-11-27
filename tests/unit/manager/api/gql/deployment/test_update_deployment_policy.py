@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
+    DeploymentStrategySpecInfo,
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
 )
@@ -121,20 +122,22 @@ def _make_policy_node_dto(
         unavailable = (
             rolling_update.max_unavailable if rolling_update is not None else _int_or_percent(0)
         )
-        strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = (
-            RollingUpdateStrategySpecInfo(
-                strategy=strategy,
+        strategy_spec = DeploymentStrategySpecInfo(
+            strategy=strategy,
+            rolling_update=RollingUpdateStrategySpecInfo(
                 max_surge=surge,
                 max_unavailable=unavailable,
-            )
+            ),
         )
     else:
         promote = blue_green.auto_promote if blue_green is not None else False
         delay = blue_green.promote_delay_seconds if blue_green is not None else 0
-        strategy_spec = BlueGreenStrategySpecInfo(
+        strategy_spec = DeploymentStrategySpecInfo(
             strategy=strategy,
-            auto_promote=promote,
-            promote_delay_seconds=delay,
+            blue_green=BlueGreenStrategySpecInfo(
+                auto_promote=promote,
+                promote_delay_seconds=delay,
+            ),
         )
     policy_id = uuid.uuid4()
     return DeploymentPolicyNodeDTO(

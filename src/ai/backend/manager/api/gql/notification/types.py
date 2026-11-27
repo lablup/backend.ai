@@ -14,11 +14,6 @@ from strawberry.relay import NodeID
 
 from ai.backend.common.data.entity.notification import NotificationChannelID, NotificationRuleID
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
-
-# NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
-# dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
-# EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
-# NotificationChannel.
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput as CreateNotificationChannelInputDTO,
 )
@@ -142,7 +137,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_interface,
     gql_pydantic_type,
     gql_resolver,
 )
@@ -166,32 +160,22 @@ NotificationRuleTypeGQL: type[NotificationRuleTypeDTO] = gql_enum(
 
 
 # GraphQL object types
-@gql_pydantic_interface(
-    BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="Interface for notification channel specifications.",
-    ),
-    model=NotificationChannelSpecInfo,
-    name="NotificationChannelSpec",
-)
-class NotificationChannelSpecGQL:
-    channel_type: NotificationChannelTypeGQL
-
-
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.3.0", description="Specification for webhook notification channel."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Specification for webhook notification channel.",
     ),
     model=WebhookSpecInfo,
     name="WebhookSpec",
 )
-class WebhookSpecGQL(NotificationChannelSpecGQL):
-    channel_type: NotificationChannelTypeGQL
+class WebhookSpecGQL:
     url: str
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="SMTP authentication credentials."
+    ),
     model=SMTPAuthInfo,
     name="SMTPAuth",
 )
@@ -200,7 +184,9 @@ class SMTPAuthGQL:
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="SMTP server connection settings."),
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="SMTP server connection settings."
+    ),
     model=SMTPConnectionInfo,
     name="SMTPConnection",
 )
@@ -212,7 +198,7 @@ class SMTPConnectionGQL:
 
 
 @gql_pydantic_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="Email message settings."),
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Email message settings."),
     model=EmailMessageInfo,
     name="EmailMessage",
 )
@@ -224,16 +210,45 @@ class EmailMessageGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.3.0", description="Specification for email notification channel."
+        added_version=NEXT_RELEASE_VERSION,
+        description="Specification for email notification channel.",
     ),
     model=EmailSpecInfo,
     name="EmailSpec",
 )
-class EmailSpecGQL(NotificationChannelSpecGQL):
-    channel_type: NotificationChannelTypeGQL
+class EmailSpecGQL:
     smtp: SMTPConnectionGQL
     message: EmailMessageGQL
     auth: SMTPAuthGQL | None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=(
+            "Notification channel specification. Exactly one of 'webhook' or 'email' is"
+            " non-null, the one matching 'channelType'."
+        ),
+    ),
+    model=NotificationChannelSpecInfo,
+    name="NotificationChannelSpec",
+)
+class NotificationChannelSpecGQL:
+    channel_type: NotificationChannelTypeGQL
+    webhook: WebhookSpecGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Webhook specification. Non-null for a webhook channel.",
+        ),
+        default=None,
+    )
+    email: EmailSpecGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Email specification. Non-null for an email channel.",
+        ),
+        default=None,
+    )
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))

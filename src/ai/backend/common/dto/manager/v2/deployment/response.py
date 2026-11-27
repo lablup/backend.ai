@@ -25,19 +25,18 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    BlueGreenStrategySpecInfo,
     ClusterConfigInfoDTO,
     DeploymentMetadataInfoDTO,
     DeploymentNetworkAccessInfoDTO,
     DeploymentPolicyInfo,
     DeploymentStrategyInfoDTO,
+    DeploymentStrategySpecInfo,
     ExtraVFolderMountGQLDTO,
     ModelDefinitionInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
-    RollingUpdateStrategySpecInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
 from ai.backend.common.types import MountPermission
@@ -319,7 +318,7 @@ class DeploymentPolicyNode(BaseResponseModel):
         description="UUID of the deployment policy. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="Parent deployment ID")
-    strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
+    strategy_spec: DeploymentStrategySpecInfo = Field(
         description="Deployment strategy specification"
     )
     created_at: datetime = Field(description="Creation timestamp")

@@ -12,7 +12,6 @@ import pytest
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import UpsertDeploymentPolicyInput
 from ai.backend.common.dto.manager.v2.deployment.response import UpsertDeploymentPolicyPayload
-from ai.backend.common.dto.manager.v2.deployment.types import RollingUpdateStrategySpecInfo
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
@@ -104,15 +103,29 @@ class ThePolicyPutComesBack(Then[ADeploymentAndACaller, Answer]):
             ),
             Same("strategy_spec.strategy", spec.strategy, DeploymentStrategy.ROLLING),
         ]
-        if isinstance(spec, RollingUpdateStrategySpecInfo):
-            verdicts += [
-                Same("strategy_spec.max_surge", spec.max_surge, IntOrPercent(percent=0.5)),
+        rolling = spec.rolling_update
+        if rolling is None:
+            verdicts.append(
                 Same(
-                    "strategy_spec.max_unavailable",
-                    spec.max_unavailable,
+                    "strategy_spec.rolling_update",
+                    type(rolling).__name__,
+                    "RollingUpdateStrategySpecInfo",
+                )
+            )
+        else:
+            verdicts += [
+                Same(
+                    "strategy_spec.rolling_update.max_surge",
+                    rolling.max_surge,
+                    IntOrPercent(percent=0.5),
+                ),
+                Same(
+                    "strategy_spec.rolling_update.max_unavailable",
+                    rolling.max_unavailable,
                     IntOrPercent(percent=0.0),
                 ),
             ]
+        verdicts.append(Same("strategy_spec.blue_green", spec.blue_green, None))
         verdicts += [
             Held("created_at", node.created_at, WrittenByThisRun(self.started)),
             Held("updated_at", node.updated_at, WrittenByThisRun(self.started)),
