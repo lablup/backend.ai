@@ -16,10 +16,12 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.response import VFolder
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAutoMountAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.vfolder_auto_mount import VFolderAutoMountDestinationReserved
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder_auto_mount import (
+    RESERVED_MOUNT_DESTINATION,
     AProjectFolderAndAutoMounts,
     AProjectFolderAndSomeone,
     TheAutoMountNode,
@@ -41,6 +43,8 @@ class ChangingTheAutoMount(
 ):
     """마운트 위치와 권한을 바꾼다."""
 
+    mount_destination: str = EDITED_AT
+
     @override
     def operation(self) -> str:
         return "update"
@@ -48,11 +52,11 @@ class ChangingTheAutoMount(
     @override
     def describe(self, laid: AProjectFolderAndAutoMounts) -> str:
         return Says(
-            f"{laid.caller.username}이 자동 마운트의 위치를 {EDITED_AT} 로, 권한을 읽기/쓰기로 "
-            "바꿉니다",
+            f"{laid.caller.username}이 자동 마운트의 위치를 {self.mount_destination} 로, 권한을 "
+            "읽기/쓰기로 바꿉니다",
             english=(
-                f"{laid.caller.username} moves the auto-mount to {EDITED_AT} and changes its "
-                "permission to read-write"
+                f"{laid.caller.username} moves the auto-mount to {self.mount_destination} and "
+                "changes its permission to read-write"
             ),
         )
 
@@ -66,7 +70,7 @@ class ChangingTheAutoMount(
             payload = await adapter.update(
                 UpdateVFolderAutoMountInput(
                     id=laid.mount.id,
-                    mount_destination=EDITED_AT,
+                    mount_destination=self.mount_destination,
                     mount_permission=MountPermission.READ_WRITE,
                 )
             )
@@ -152,9 +156,49 @@ class AUserGrantedNothingMayNotChangeTheAutoMount(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class MovingAnAutoMountToAReservedPathIsRefused(
+    Scenario[
+        TestSeedingSession,
+        AProjectFolderAndAutoMounts,
+        VFolderAutoMountAdapter,
+        VFolderAutoMountNode,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "moving-an-auto-mount-to-a-reserved-path-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자동 마운트 수정 권한을 받은 사용자가 자동 마운트의 위치를 내부용으로 예약된 "
+            "경로로 바꾸려 하면 거부됩니다",
+            english=(
+                "when a user granted auto-mount update tries to move an auto-mount to a path "
+                "reserved for internal use, it is rejected"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectFolderAndAutoMounts]:
+        return AProjectFolderAndSomeone(permissions=(Permission.UPDATE,), mounted=True)
+
+    @override
+    def when(
+        self,
+    ) -> When[AProjectFolderAndAutoMounts, VFolderAutoMountAdapter, VFolderAutoMountNode]:
+        return ChangingTheAutoMount(mount_destination=RESERVED_MOUNT_DESTINATION)
+
+    @override
+    def then(self) -> Then[AProjectFolderAndAutoMounts, VFolderAutoMountNode]:
+        return TheCallIsRefused(VFolderAutoMountDestinationReserved)
+
+
 SCENARIOS: list[EditingStep] = [
     AGrantedUserChangesTheAutoMount(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotChangeTheAutoMount(),
+    MovingAnAutoMountToAReservedPathIsRefused(),
 ]
 
 

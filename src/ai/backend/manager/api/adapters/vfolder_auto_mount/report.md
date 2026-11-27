@@ -4,14 +4,14 @@
 
 Scenario: complete
 
-- built from ops (5)
+- built from ops (4)
   - bulk_get_ids: representative success ✓ · representative rejection ✓
   - delete: representative success ✓ · representative rejection ✓
   - global_search: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
-  - update: representative success ✓ · representative rejection ✓
-- direct implementation (1)
-  - create: success present 1 · rejection present 1 (scope)
+- direct implementation (2)
+  - create: success present 1 · rejection present 2 (scope)
+  - update: success present 1 · rejection present 2 (single_entity)
 
 **bulk_get_ids**
 
@@ -42,19 +42,21 @@ Scenario: complete
 | [when a user granted auto-mount read in a project searches by a destination fragment, ordered by destination and limited to one page, one page holding only the two matching auto-mounts in destination order comes back](#searching-a-user-granted-auto-mount-read-lists-the-project-auto-mounts) | answered |
 | [when a user granted nothing tries to list the auto-mounts of a project, it is rejected for lack of permission](#searching-a-user-granted-nothing-may-not-list-project-auto-mounts) | rejected |
 
-**update**
-
-| scenario | verdict |
-|---|---|
-| [when a user granted auto-mount update changes its destination and permission, the changed auto-mount comes back](#editing-a-user-granted-auto-mount-update-changes-its-destination) | answered |
-| [when a user granted nothing tries to change an auto-mount, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-change-an-auto-mount) | rejected |
-
 **create**
 
 | scenario | verdict |
 |---|---|
 | [when a user granted auto-mount create in a project registers one of its folders, the auto-mount naming that folder comes back](#creating-a-user-granted-auto-mount-create-registers-a-project-folder) | answered |
 | [when a user granted nothing tries to register an auto-mount, it is rejected for lack of permission](#creating-a-user-granted-nothing-may-not-register-an-auto-mount) | rejected |
+| [when a user granted auto-mount create tries to register an auto-mount at a path reserved for internal use, it is rejected](#creating-registering-an-auto-mount-at-a-reserved-path-is-refused) | rejected |
+
+**update**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted auto-mount update changes its destination and permission, the changed auto-mount comes back](#editing-a-user-granted-auto-mount-update-changes-its-destination) | answered |
+| [when a user granted nothing tries to change an auto-mount, it is rejected for lack of permission](#editing-a-user-granted-nothing-may-not-change-an-auto-mount) | rejected |
+| [when a user granted auto-mount update tries to move an auto-mount to a path reserved for internal use, it is rejected](#editing-moving-an-auto-mount-to-a-reserved-path-is-refused) | rejected |
 
 ### bulk_get_ids
 
@@ -428,6 +430,106 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
+### create
+
+<a id="creating-a-user-granted-auto-mount-create-registers-a-project-folder"></a>
+
+#### [a-user-granted-auto-mount-create-registers-a-project-folder](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_creating.py): pass
+
+when a user granted auto-mount create in a project registers one of its folders, the auto-mount naming that folder comes back
+
+Given
+
+- a project with one vfolder and one user granted the CREATE permission on auto-mounts
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Prepare a user granted the CREATE permission on vfolder auto-mounts in the project
+    - Role auto-mount-user-1: applies only within the scope it is granted in
+    - Role auto-mount-user-1: CREATE allowed on every vfolder_auto_mount
+    - regular user user-1: holds Role auto-mount-user-1
+
+When
+
+- VFolderAutoMountAdapter.create: user-1 auto-mounts the folder-1 vfolder of the project-1 project at /home/work/extra
+
+Then
+
+- the whole live auto-mount comes back
+  - id: same as the entity_id
+  - scope_type = 'project'
+  - scope_id: same as the project the folder is in
+  - vfolder_id: same as the auto-mounted vfolder
+  - mount_destination = '/home/work/extra'
+  - subpath = '.'
+  - mount_permission = 'ro'
+  - created_at: the time this run wrote
+  - updated_at: the time this run wrote
+  - deleted_at = None
+
+<a id="creating-a-user-granted-nothing-may-not-register-an-auto-mount"></a>
+
+#### [a-user-granted-nothing-may-not-register-an-auto-mount](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_creating.py): pass
+
+when a user granted nothing tries to register an auto-mount, it is rejected for lack of permission
+
+Given
+
+- a project with one vfolder and one user holding no permission
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+
+When
+
+- VFolderAutoMountAdapter.create: user-1 auto-mounts the folder-1 vfolder of the project-1 project at /home/work/extra
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="creating-registering-an-auto-mount-at-a-reserved-path-is-refused"></a>
+
+#### [registering-an-auto-mount-at-a-reserved-path-is-refused](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_creating.py): pass
+
+when a user granted auto-mount create tries to register an auto-mount at a path reserved for internal use, it is rejected
+
+Given
+
+- a project with one vfolder and one user granted the CREATE permission on auto-mounts
+  - Domain home-1: vfolders of this domain can be placed on local:volume1
+  - Prepare one user in the domain
+    - Project resource policy default: the personal project created along with a user looks it up by this name
+    - User resource policy user-policy-1: up to 10 folders per user
+    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
+    - regular user user-1: has their own keypair and personal project
+  - Project project-1
+  - Project vfolder folder-1: is placed in the project and is ready to use
+  - Prepare a user granted the CREATE permission on vfolder auto-mounts in the project
+    - Role auto-mount-user-1: applies only within the scope it is granted in
+    - Role auto-mount-user-1: CREATE allowed on every vfolder_auto_mount
+    - regular user user-1: holds Role auto-mount-user-1
+
+When
+
+- VFolderAutoMountAdapter.create: user-1 auto-mounts the folder-1 vfolder of the project-1 project at /home/work/.ssh
+
+Then
+
+- the call is rejected
+  - rejected: VFolderAutoMountDestinationReserved
+
 ### update
 
 <a id="editing-a-user-granted-auto-mount-update-changes-its-destination"></a>
@@ -499,17 +601,15 @@ Then
 - the call is rejected
   - rejected: NotEnoughPermission
 
-### create
+<a id="editing-moving-an-auto-mount-to-a-reserved-path-is-refused"></a>
 
-<a id="creating-a-user-granted-auto-mount-create-registers-a-project-folder"></a>
+#### [moving-an-auto-mount-to-a-reserved-path-is-refused](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_editing.py): pass
 
-#### [a-user-granted-auto-mount-create-registers-a-project-folder](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_creating.py): pass
-
-when a user granted auto-mount create in a project registers one of its folders, the auto-mount naming that folder comes back
+when a user granted auto-mount update tries to move an auto-mount to a path reserved for internal use, it is rejected
 
 Given
 
-- a project with one vfolder and one user granted the CREATE permission on auto-mounts
+- a project with one vfolder and one user granted the UPDATE permission on auto-mounts, and the folder already auto-mounted
   - Domain home-1: vfolders of this domain can be placed on local:volume1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -518,53 +618,18 @@ Given
     - regular user user-1: has their own keypair and personal project
   - Project project-1
   - Project vfolder folder-1: is placed in the project and is ready to use
-  - Prepare a user granted the CREATE permission on vfolder auto-mounts in the project
+  - Prepare a user granted the UPDATE permission on vfolder auto-mounts in the project
     - Role auto-mount-user-1: applies only within the scope it is granted in
-    - Role auto-mount-user-1: CREATE allowed on every vfolder_auto_mount
+    - Role auto-mount-user-1: UPDATE allowed on every vfolder_auto_mount
     - regular user user-1: holds Role auto-mount-user-1
+  - Vfolder auto-mount auto-mount-1: is mounted at /home/work/extra with ro
 
 When
 
-- VFolderAutoMountAdapter.create: user-1 auto-mounts the folder-1 vfolder of the project-1 project at /home/work/extra
-
-Then
-
-- the whole live auto-mount comes back
-  - id: same as the entity_id
-  - scope_type = 'project'
-  - scope_id: same as the project the folder is in
-  - vfolder_id: same as the auto-mounted vfolder
-  - mount_destination = '/home/work/extra'
-  - subpath = '.'
-  - mount_permission = 'ro'
-  - created_at: the time this run wrote
-  - updated_at: the time this run wrote
-  - deleted_at = None
-
-<a id="creating-a-user-granted-nothing-may-not-register-an-auto-mount"></a>
-
-#### [a-user-granted-nothing-may-not-register-an-auto-mount](/tests/scenario/bai_scenario/manager/vfolder_auto_mount/test_creating.py): pass
-
-when a user granted nothing tries to register an auto-mount, it is rejected for lack of permission
-
-Given
-
-- a project with one vfolder and one user holding no permission
-  - Domain home-1: vfolders of this domain can be placed on local:volume1
-  - Prepare one user in the domain
-    - Project resource policy default: the personal project created along with a user looks it up by this name
-    - User resource policy user-policy-1: up to 10 folders per user
-    - Keypair policy keypair-policy-1: up to 5 concurrent sessions, folders can be placed on local:volume1
-    - regular user user-1: has their own keypair and personal project
-  - Project project-1
-  - Project vfolder folder-1: is placed in the project and is ready to use
-
-When
-
-- VFolderAutoMountAdapter.create: user-1 auto-mounts the folder-1 vfolder of the project-1 project at /home/work/extra
+- VFolderAutoMountAdapter.update: user-1 moves the auto-mount to /home/work/.ssh and changes its permission to read-write
 
 Then
 
 - the call is rejected
-  - rejected: NotEnoughPermission
+  - rejected: VFolderAutoMountDestinationReserved
 

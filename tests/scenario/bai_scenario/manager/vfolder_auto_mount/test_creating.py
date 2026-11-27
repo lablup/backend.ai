@@ -18,11 +18,13 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import VFolderAut
 from ai.backend.common.types import MountPermission
 from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAutoMountAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.vfolder_auto_mount import VFolderAutoMountDestinationReserved
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Says, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.vfolder_auto_mount import (
     MOUNTED_AT,
+    RESERVED_MOUNT_DESTINATION,
     AProjectFolderAndAutoMounts,
     AProjectFolderAndSomeone,
     TheAutoMountNode,
@@ -42,6 +44,8 @@ class CreatingTheAutoMount(
 ):
     """그 프로젝트의 폴더를 자동 마운트로 등록한다."""
 
+    mount_destination: str = MOUNTED_AT
+
     @override
     def operation(self) -> str:
         return "create"
@@ -50,10 +54,10 @@ class CreatingTheAutoMount(
     def describe(self, laid: AProjectFolderAndAutoMounts) -> str:
         return Says(
             f"{laid.caller.username}이 {laid.project.name} 프로젝트의 {laid.folder.name} "
-            f"vfolder 를 {MOUNTED_AT} 에 자동 마운트합니다",
+            f"vfolder 를 {self.mount_destination} 에 자동 마운트합니다",
             english=(
                 f"{laid.caller.username} auto-mounts the {laid.folder.name} vfolder of the "
-                f"{laid.project.name} project at {MOUNTED_AT}"
+                f"{laid.project.name} project at {self.mount_destination}"
             ),
         )
 
@@ -69,7 +73,7 @@ class CreatingTheAutoMount(
                         scope_id=laid.project.id,
                     ),
                     vfolder_id=laid.folder.id,
-                    mount_destination=MOUNTED_AT,
+                    mount_destination=self.mount_destination,
                     mount_permission=MountPermission.READ_ONLY,
                 )
             )
@@ -155,9 +159,49 @@ class AUserGrantedNothingMayNotAutoMount(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class AutoMountingAtAReservedPathIsRefused(
+    Scenario[
+        TestSeedingSession,
+        AProjectFolderAndAutoMounts,
+        VFolderAutoMountAdapter,
+        VFolderAutoMountNode,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "registering-an-auto-mount-at-a-reserved-path-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return Says(
+            "자동 마운트 생성 권한을 받은 사용자가 내부용으로 예약된 경로에 자동 마운트를 "
+            "등록하려 하면 거부됩니다",
+            english=(
+                "when a user granted auto-mount create tries to register an auto-mount at a "
+                "path reserved for internal use, it is rejected"
+            ),
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AProjectFolderAndAutoMounts]:
+        return AProjectFolderAndSomeone(permissions=(Permission.CREATE,))
+
+    @override
+    def when(
+        self,
+    ) -> When[AProjectFolderAndAutoMounts, VFolderAutoMountAdapter, VFolderAutoMountNode]:
+        return CreatingTheAutoMount(mount_destination=RESERVED_MOUNT_DESTINATION)
+
+    @override
+    def then(self) -> Then[AProjectFolderAndAutoMounts, VFolderAutoMountNode]:
+        return TheCallIsRefused(VFolderAutoMountDestinationReserved)
+
+
 SCENARIOS: list[CreatingStep] = [
     AGrantedUserAutoMountsAProjectFolder(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotAutoMount(),
+    AutoMountingAtAReservedPathIsRefused(),
 ]
 
 

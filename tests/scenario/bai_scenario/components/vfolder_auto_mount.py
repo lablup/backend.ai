@@ -54,6 +54,9 @@ from bai_scenario.seeds.vfolder_auto_mount.vfolder_auto_mount import (
 MOUNTED_AT = "/home/work/extra"
 """Where the scenarios mount the folder."""
 
+RESERVED_MOUNT_DESTINATION = "/home/work/.ssh"
+"""A path reserved for internal use, where no folder may be mounted."""
+
 
 @dataclass(frozen=True)
 class AProjectFolderAndAutoMounts:

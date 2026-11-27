@@ -17,9 +17,10 @@
 | `restore` | row 하나 | 지정한 row |
 | `purge` | row 하나 | 지정한 row |
 
-## create 만 service method 를 둔다
+## create 와 update 만 service method 를 둔다
 
 - create 의 spec 은 vfolder 가 속한 프로젝트에 대한 전제 조건을 담는데 generic create 는 이를 받지 않는다. service 가 이를 domain repository 에 전달한다.
+- create 와 update 는 `verify_mount_destination` 이 False 를 반환하는 마운트 위치와 vfolder 밖을 참조하는 subpath 를 거부한다. 세션도 요청된 마운트에 같은 검사를 한다.
 - 다른 operation 은 generic ops service 에 spec 을 전달하므로 `service.py` method 를 갖지 않는다.
 
 ## admin search 는 global 이다
