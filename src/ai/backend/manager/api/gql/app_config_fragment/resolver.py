@@ -39,10 +39,12 @@ from .types import (
     AppConfigFragmentOrderByGQL,
     AppConfigScopeRefGQL,
     AtomicBulkUpsertAppConfigFragmentsPayloadGQL,
+    MyPatchAppConfigFragmentsInputGQL,
     MyUpsertAppConfigFragmentsInputGQL,
     PartialBulkAppConfigFragmentsPayloadGQL,
     PartialBulkPurgeAppConfigFragmentsInputGQL,
     PurgeAppConfigFragmentPayloadGQL,
+    ScopedPatchAppConfigFragmentsInputGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
     UpsertAppConfigFragmentsPayloadGQL,
 )
@@ -143,6 +145,45 @@ async def my_atomic_bulk_upsert_app_config_fragments(
     input: MyUpsertAppConfigFragmentsInputGQL,
 ) -> AtomicBulkUpsertAppConfigFragmentsPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.my_atomic_bulk_upsert(
+        input.to_pydantic()
+    )
+    return AtomicBulkUpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Set and unset top-level keys of many app config fragments at one scope, leaving "
+            "their other keys as they are, all or none. A fragment that does not exist yet is "
+            "created with the keys set."
+        ),
+    )
+)
+async def scoped_atomic_bulk_patch_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: ScopedPatchAppConfigFragmentsInputGQL,
+) -> AtomicBulkUpsertAppConfigFragmentsPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.scoped_atomic_bulk_patch(
+        input.to_pydantic()
+    )
+    return AtomicBulkUpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Set and unset top-level keys of many app config fragments at the current user's "
+            "own user scope, leaving their other keys as they are, all or none."
+        ),
+    )
+)
+async def my_atomic_bulk_patch_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: MyPatchAppConfigFragmentsInputGQL,
+) -> AtomicBulkUpsertAppConfigFragmentsPayloadGQL:
+    payload = await info.context.adapters.app_config_fragment.my_atomic_bulk_patch(
         input.to_pydantic()
     )
     return AtomicBulkUpsertAppConfigFragmentsPayloadGQL.from_pydantic(payload)

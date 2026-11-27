@@ -12,9 +12,11 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentPatch,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
@@ -165,3 +167,65 @@ class TestBulkPurgeAppConfigFragmentInput:
     def test_bulk_purge_rejects_an_empty_batch(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             BulkPurgeAppConfigFragmentInput.model_validate({"ids": []})
+
+
+class TestAppConfigFragmentPatch:
+    """A patch names top-level keys to set and to unset, each key once."""
+
+    def test_set_and_unset_are_accepted_together(self) -> None:
+        patch = AppConfigFragmentPatch.model_validate({
+            "config_name": "theme",
+            "set": [{"key": "mode", "value": {"nested": [1, 2]}}],
+            "unset": ["banner"],
+        })
+
+        assert [(entry.key, entry.value) for entry in patch.set or []] == [
+            ("mode", {"nested": [1, 2]})
+        ]
+        assert patch.unset == ["banner"]
+
+    def test_unset_alone_is_accepted(self) -> None:
+        patch = AppConfigFragmentPatch.model_validate({"config_name": "theme", "unset": ["a"]})
+
+        assert patch.set is None
+
+    def test_a_key_is_never_read_as_a_path(self) -> None:
+        patch = AppConfigFragmentPatch.model_validate({
+            "config_name": "theme",
+            "set": [{"key": "a.b", "value": 1}],
+        })
+
+        assert patch.set is not None
+        assert patch.set[0].key == "a.b"
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            pytest.param({"config_name": "theme"}, id="neither-set-nor-unset"),
+            pytest.param({"config_name": "theme", "set": [], "unset": []}, id="both-empty"),
+            pytest.param(
+                {
+                    "config_name": "theme",
+                    "set": [{"key": "a", "value": 1}, {"key": "a", "value": 2}],
+                },
+                id="same-key-twice-in-set",
+            ),
+            pytest.param(
+                {"config_name": "theme", "unset": ["a", "a"]}, id="same-key-twice-in-unset"
+            ),
+            pytest.param(
+                {"config_name": "theme", "set": [{"key": "a", "value": 1}], "unset": ["a"]},
+                id="same-key-in-set-and-unset",
+            ),
+            pytest.param(
+                {"config_name": "theme", "set": [{"key": "", "value": 1}]}, id="empty-key"
+            ),
+        ],
+    )
+    def test_an_invalid_patch_is_rejected(self, body: dict[str, Any]) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            AppConfigFragmentPatch.model_validate(body)
+
+    def test_an_empty_batch_is_rejected(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            MyPatchAppConfigFragmentsInput.model_validate({"items": []})

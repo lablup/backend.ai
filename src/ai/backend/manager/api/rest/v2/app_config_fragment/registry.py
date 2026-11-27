@@ -34,6 +34,8 @@ def register_v2_app_config_fragment_routes(
         POST   /scoped/atomic-bulk-upsert   upsert many at one scope       (auth, RBAC)
         POST   /my/by-names                 read own scope's by names      (auth)
         POST   /my/atomic-bulk-upsert       upsert many at own scope       (auth)
+        POST   /scoped/atomic-bulk-patch    patch top-level keys at a scope (auth, RBAC)
+        POST   /my/atomic-bulk-patch        patch top-level keys at own scope (auth)
         GET    /{fragment_id}               get by id                      (auth, RBAC)
         DELETE /{fragment_id}               purge by id                    (auth, RBAC)
         POST   /bulk-delete                 purge many by id (deprecated)  (auth, RBAC)
@@ -58,6 +60,15 @@ def register_v2_app_config_fragment_routes(
     registry.add("POST", "/my/by-names", handler.my_fragments_by_names, middlewares=[auth_required])
     registry.add(
         "POST", "/my/atomic-bulk-upsert", handler.my_atomic_bulk_upsert, middlewares=[auth_required]
+    )
+    registry.add(
+        "POST",
+        "/scoped/atomic-bulk-patch",
+        handler.scoped_atomic_bulk_patch,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST", "/my/atomic-bulk-patch", handler.my_atomic_bulk_patch, middlewares=[auth_required]
     )
     registry.add("GET", "/{fragment_id}", handler.get, middlewares=[auth_required])
     registry.add("DELETE", "/{fragment_id}", handler.purge, middlewares=[auth_required])

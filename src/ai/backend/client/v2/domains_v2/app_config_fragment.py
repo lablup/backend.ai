@@ -10,9 +10,11 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
     PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPatchAppConfigFragmentsInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -68,6 +70,18 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
         )
 
+    async def scoped_atomic_bulk_patch_app_config_fragments(
+        self,
+        request: ScopedPatchAppConfigFragmentsInput,
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Set and unset top-level keys of many fragments at one scope, all or none."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/scoped/atomic-bulk-patch",
+            request=request,
+            response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
+        )
+
     async def scoped_bulk_upsert_app_config_fragments(
         self,
         request: ScopedUpsertAppConfigFragmentsInput,
@@ -102,6 +116,18 @@ class V2AppConfigFragmentClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/my/atomic-bulk-upsert",
+            request=request,
+            response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
+        )
+
+    async def my_atomic_bulk_patch_app_config_fragments(
+        self,
+        request: MyPatchAppConfigFragmentsInput,
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Set and unset top-level keys of many fragments at the caller's own user scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/my/atomic-bulk-patch",
             request=request,
             response_model=AtomicBulkUpsertAppConfigFragmentsPayload,
         )

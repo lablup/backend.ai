@@ -12,6 +12,7 @@ from ai.backend.client.cli.v2.helpers import (
     run_async,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentPatch,
     AppConfigFragmentUpsertItem,
 )
 
@@ -72,6 +73,39 @@ def update(items: str) -> None:
         try:
             result = await registry.app_config_fragment.my_bulk_upsert_app_config_fragments(
                 MyUpsertAppConfigFragmentsInput(items=parsed_items)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
+
+
+@app_config_fragment.command()
+@click.option(
+    "--items",
+    required=True,
+    help=(
+        'JSON array of {"config_name": ..., "set": [{"key": ..., "value": ...}], '
+        '"unset": ["key"]} objects, or @path to a file holding it.'
+    ),
+)
+def patch(items: str) -> None:
+    """Set and unset top-level keys of my fragments, all-or-nothing.
+
+    Each item changes only the keys it names; the rest of my fragment stays as it is.
+    """
+    from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+        MyPatchAppConfigFragmentsInput,
+    )
+
+    parsed_items = load_model(items, list[AppConfigFragmentPatch])
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.app_config_fragment.my_atomic_bulk_patch_app_config_fragments(
+                MyPatchAppConfigFragmentsInput(items=parsed_items)
             )
             print_result(result)
         finally:

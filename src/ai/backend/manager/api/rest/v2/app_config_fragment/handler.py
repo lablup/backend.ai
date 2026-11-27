@@ -12,9 +12,11 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
     PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPatchAppConfigFragmentsInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -127,6 +129,22 @@ class V2AppConfigFragmentHandler:
     ) -> APIResponse:
         """Upsert many fragments at the caller's own user scope, all or none (auth)."""
         result = await self._adapter.my_atomic_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_atomic_bulk_patch(
+        self,
+        body: BodyParam[ScopedPatchAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Set and unset top-level keys of many fragments at one scope, all or none (auth, RBAC)."""
+        result = await self._adapter.scoped_atomic_bulk_patch(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_atomic_bulk_patch(
+        self,
+        body: BodyParam[MyPatchAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Patch many fragments at the caller's own user scope, all or none (auth)."""
+        result = await self._adapter.my_atomic_bulk_patch(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_bulk_upsert(

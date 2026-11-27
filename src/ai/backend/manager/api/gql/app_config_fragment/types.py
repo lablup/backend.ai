@@ -16,10 +16,16 @@ from strawberry.scalars import JSON
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentEntry as AppConfigFragmentEntryDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentFilter as AppConfigFragmentFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentOrder as AppConfigFragmentOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentPatch as AppConfigFragmentPatchDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem as AppConfigFragmentUpsertItemDTO,
@@ -28,10 +34,16 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigScopeRef as AppConfigScopeRefDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    MyPatchAppConfigFragmentsInput as MyPatchAppConfigFragmentsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyUpsertAppConfigFragmentsInput as MyUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     PartialBulkPurgeAppConfigFragmentsInput as PartialBulkPurgeAppConfigFragmentsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    ScopedPatchAppConfigFragmentsInput as ScopedPatchAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     ScopedUpsertAppConfigFragmentsInput as ScopedUpsertAppConfigFragmentsInputDTO,
@@ -75,19 +87,23 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 __all__ = (
     "AppConfigFragmentConnection",
     "AppConfigFragmentEdge",
+    "AppConfigFragmentEntryGQL",
     "AppConfigFragmentFilterGQL",
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
+    "AppConfigFragmentPatchGQL",
     "AppConfigFragmentUpsertErrorGQL",
     "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeRefGQL",
     "AppConfigScopeTypeFilterGQL",
     "AtomicBulkUpsertAppConfigFragmentsPayloadGQL",
+    "MyPatchAppConfigFragmentsInputGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
     "PartialBulkAppConfigFragmentsPayloadGQL",
     "PartialBulkPurgeAppConfigFragmentsInputGQL",
     "PurgeAppConfigFragmentPayloadGQL",
+    "ScopedPatchAppConfigFragmentsInputGQL",
     "ScopedUpsertAppConfigFragmentsInputGQL",
     "UpsertAppConfigFragmentsPayloadGQL",
 )
@@ -148,6 +164,65 @@ class ScopedUpsertAppConfigFragmentsInputGQL(
 class MyUpsertAppConfigFragmentsInputGQL(PydanticInputMixin[MyUpsertAppConfigFragmentsInputDTO]):
     items: list[AppConfigFragmentUpsertItemGQL] = gql_field(
         description="The (config_name, config) pairs to upsert."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One top-level key of a fragment document and the value it is set to.",
+    ),
+    name="AppConfigFragmentEntry",
+)
+class AppConfigFragmentEntryGQL(PydanticInputMixin[AppConfigFragmentEntryDTO]):
+    key: str = gql_field(description="Top-level key; never read as a path.")
+    value: JSON = gql_field(description="The value the key is set to, as a whole.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Set and unset top-level keys of one fragment, leaving its other keys as they are. "
+            "A patch names at least one key; a key appears once across `set` and `unset`."
+        ),
+    ),
+    name="AppConfigFragmentPatch",
+)
+class AppConfigFragmentPatchGQL(PydanticInputMixin[AppConfigFragmentPatchDTO]):
+    config_name: str = gql_field(description="Registered config name.")
+    set: list[AppConfigFragmentEntryGQL] | None = gql_field(
+        description="Keys to set, each replacing its whole value.", default=None
+    )
+    unset: list[str] | None = gql_field(description="Keys to remove.", default=None)
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch many fragments at one scope; the scope is named once for all items.",
+    ),
+    name="ScopedPatchAppConfigFragmentsInput",
+)
+class ScopedPatchAppConfigFragmentsInputGQL(
+    PydanticInputMixin[ScopedPatchAppConfigFragmentsInputDTO]
+):
+    scope: AppConfigScopeRefGQL = gql_field(description="Scope the fragments are written at.")
+    items: list[AppConfigFragmentPatchGQL] = gql_field(
+        description="The fragment patches, one per config name."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Patch many fragments at the current user's own user scope.",
+    ),
+    name="MyPatchAppConfigFragmentsInput",
+)
+class MyPatchAppConfigFragmentsInputGQL(PydanticInputMixin[MyPatchAppConfigFragmentsInputDTO]):
+    items: list[AppConfigFragmentPatchGQL] = gql_field(
+        description="The fragment patches, one per config name."
     )
 
 

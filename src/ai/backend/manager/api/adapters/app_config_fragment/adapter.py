@@ -16,13 +16,16 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
+    AppConfigFragmentPatch,
     AppConfigFragmentScope,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
     MyAppConfigFragmentsByNamesInput,
+    MyPatchAppConfigFragmentsInput,
     MyUpsertAppConfigFragmentsInput,
     PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
+    ScopedPatchAppConfigFragmentsInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
@@ -59,7 +62,9 @@ from ai.backend.manager.models.app_config_fragment.searchers import (
     AppConfigFragmentSearcher,
 )
 from ai.backend.manager.models.app_config_fragment.upserters import (
+    AppConfigFragmentPatchUpserter,
     AppConfigFragmentUpserter,
+    PublicAppConfigFragmentPatchUpserter,
     PublicAppConfigFragmentUpserter,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -132,6 +137,25 @@ class AppConfigFragmentAdapter(BaseAdapter):
             raise UnreachableError("User context is not available")
         return await self._upsert(UserID(me.user_id), input.items)
 
+    async def scoped_atomic_bulk_patch(
+        self, input: ScopedPatchAppConfigFragmentsInput
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Set and unset top-level keys of many fragments at the scope named in ``input``,
+        all or none."""
+        return await self._patch(self._ref_owner(input.scope), input.items)
+
+    async def my_atomic_bulk_patch(
+        self, input: MyPatchAppConfigFragmentsInput
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Patch many fragments at the current user's own user scope, all or none.
+
+        Calls ``current_user()`` internally — the caller does not pass a scope.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self._patch(UserID(me.user_id), input.items)
+
     async def _upsert(
         self,
         owner: EntityIdentifier | None,
@@ -140,28 +164,64 @@ class AppConfigFragmentAdapter(BaseAdapter):
         """Route by who owns the fragments: a public write answers to no scope, so it runs
         behind the SUPERADMIN gate instead."""
         if owner is None:
-            written = await self._app_config.fragment_global_bulk_upsert.run(
-                GlobalBulkUpsertAppConfigFragmentsAction(
-                    upserters=[
-                        PublicAppConfigFragmentUpserter(
-                            config_name=item.config_name, config=item.config
-                        )
-                        for item in items
-                    ]
+            return await self._run_public_upserters([
+                PublicAppConfigFragmentUpserter(config_name=item.config_name, config=item.config)
+                for item in items
+            ])
+        return await self._run_upserters(
+            owner,
+            [
+                AppConfigFragmentUpserter(
+                    config_name=item.config_name, owner=owner, config=item.config
                 )
-            )
-        else:
-            written = await self._app_config.fragment_bulk_upsert.run(
-                BulkUpsertAppConfigFragmentsAction(
+                for item in items
+            ],
+        )
+
+    async def _patch(
+        self,
+        owner: EntityIdentifier | None,
+        items: Sequence[AppConfigFragmentPatch],
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Route as :meth:`_upsert` does, with upserters that patch the top-level keys."""
+        if owner is None:
+            return await self._run_public_upserters([
+                PublicAppConfigFragmentPatchUpserter(
+                    config_name=item.config_name,
+                    config={entry.key: entry.value for entry in item.set or []},
+                    unset=item.unset or [],
+                )
+                for item in items
+            ])
+        return await self._run_upserters(
+            owner,
+            [
+                AppConfigFragmentPatchUpserter(
+                    config_name=item.config_name,
                     owner=owner,
-                    upserters=[
-                        AppConfigFragmentUpserter(
-                            config_name=item.config_name, owner=owner, config=item.config
-                        )
-                        for item in items
-                    ],
+                    config={entry.key: entry.value for entry in item.set or []},
+                    unset=item.unset or [],
                 )
-            )
+                for item in items
+            ],
+        )
+
+    async def _run_public_upserters(
+        self, upserters: Sequence[PublicAppConfigFragmentUpserter]
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        written = await self._app_config.fragment_global_bulk_upsert.run(
+            GlobalBulkUpsertAppConfigFragmentsAction(upserters=upserters)
+        )
+        return AtomicBulkUpsertAppConfigFragmentsPayload(
+            items=[self._fragment_to_node(fragment) for fragment in written.items],
+        )
+
+    async def _run_upserters(
+        self, owner: EntityIdentifier, upserters: Sequence[AppConfigFragmentUpserter]
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        written = await self._app_config.fragment_bulk_upsert.run(
+            BulkUpsertAppConfigFragmentsAction(owner=owner, upserters=upserters)
+        )
         return AtomicBulkUpsertAppConfigFragmentsPayload(
             items=[self._fragment_to_node(fragment) for fragment in written.items],
         )
