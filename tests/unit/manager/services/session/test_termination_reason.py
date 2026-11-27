@@ -10,6 +10,7 @@ import pytest
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, SessionId
@@ -81,7 +82,10 @@ async def session_service(
 ) -> SessionService:
     session_repository = MagicMock()
     session_repository.batch_get_owner_id_by_session = AsyncMock(
-        return_value={owned_session_id: owner.user_id, others_session_id: uuid.uuid4()}
+        return_value={
+            owned_session_id: UserID(owner.user_id),
+            others_session_id: UserID(uuid.uuid4()),
+        }
     )
     session_repository.get_target_session_ids = AsyncMock(return_value=[others_session_id])
     return SessionService(
