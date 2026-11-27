@@ -424,7 +424,10 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.rbac.permission_check,
         ),
-        vfolder_auto_mount=VFolderAutoMountService(repositories.vfolder_auto_mount.repository),
+        vfolder_auto_mount=VFolderAutoMountService(
+            repositories.vfolder_auto_mount.repository,
+            OpsRepository(repositories.v2_ops_provider),
+        ),
         session_group=SessionGroupService(OpsRepository(repositories.v2_ops_provider)),
         session=SessionService(
             SessionServiceArgs(

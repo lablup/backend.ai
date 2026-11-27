@@ -36,7 +36,7 @@ async def adapter(
             repository=OpsRepository(provider),
         )
     )
-    service = VFolderAutoMountService(VFolderAutoMountRepository(provider))
+    service = VFolderAutoMountService(VFolderAutoMountRepository(provider), OpsRepository(provider))
     return VFolderAutoMountAdapter(
         VFolderAutoMountProcessors(registry.group(GroupMeta(VFolderAutoMountEntityType())), service)
     )

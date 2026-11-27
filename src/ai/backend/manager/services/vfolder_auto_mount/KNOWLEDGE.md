@@ -1,9 +1,9 @@
 ---
 name: vfolder-auto-mount-service-shapes
 type: design-rationale
-description: vfolder_auto_mount service knowledge - why only the create has a service method, why one search is global and the other per scope, what each operation is authorized against, why the read by ids is partial
+description: vfolder_auto_mount service knowledge - why only the create and the update have a service method, why one search is global and the other per scope, what each operation is authorized against, why the read by ids is partial
 scope: src/ai/backend/manager/services/vfolder_auto_mount
-keywords: [GlobalSearchVFolderAutoMountsAction, SearchVFolderAutoMountsAction, CreateVFolderAutoMountAction, BulkGetVFolderAutoMountsAction, VFolderAutoMountProcessors, VFolderAutoMountService, VFolderAutoMountCreator, global_searcher_ops, scoped_search_ops, partial_bulk_get_ops]
+keywords: [GlobalSearchVFolderAutoMountsAction, SearchVFolderAutoMountsAction, CreateVFolderAutoMountAction, UpdateVFolderAutoMountAction, BulkGetVFolderAutoMountsAction, VFolderAutoMountProcessors, VFolderAutoMountService, VFolderAutoMountCreator, global_searcher_ops, scoped_search_ops, partial_bulk_get_ops]
 sources:
   - src/ai/backend/manager/services/vfolder_auto_mount
   - src/ai/backend/manager/models/vfolder_auto_mount
@@ -36,10 +36,13 @@ This package holds the operations a caller reaches through the API.
 | `restore` | one row | the named row |
 | `purge` | one row | the named row |
 
-## Only the create has a service method
+## Only the create and the update have a service method
 
 - The create's spec carries a precondition on the project the vfolder belongs to, which the
   generic create does not take. The service hands it to the domain repository.
+- The create and the update reject a mount destination `verify_mount_destination` returns
+  False for and a subpath leading outside the vfolder. A session runs the same checks on a
+  requested mount.
 - The other operations hand a spec to the generic ops services, so they have no
   `service.py` method.
 

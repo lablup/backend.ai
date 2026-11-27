@@ -41,3 +41,37 @@ class VFolderAutoMountDestinationInUse(EntityError, web.HTTPConflict):
         return EntityErrorCode(
             VFolderAutoMountEntityType(), ActionOperationType.UPDATE, ErrorDetail.ALREADY_EXISTS
         )
+
+
+class VFolderAutoMountDestinationReserved(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-auto-mount-destination-reserved"
+    error_title = "The mount destination is a path reserved for internal use."
+
+    _operation: ActionOperationType
+
+    def __init__(self, extra_msg: str | None = None, *, operation: ActionOperationType) -> None:
+        self._operation = operation
+        super().__init__(extra_msg)
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderAutoMountEntityType(), self._operation, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
+class VFolderAutoMountSubpathOutsideVFolder(EntityError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-auto-mount-subpath-outside-vfolder"
+    error_title = "The subpath leads outside the vfolder."
+
+    _operation: ActionOperationType
+
+    def __init__(self, extra_msg: str | None = None, *, operation: ActionOperationType) -> None:
+        self._operation = operation
+        super().__init__(extra_msg)
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            VFolderAutoMountEntityType(), self._operation, ErrorDetail.INVALID_PARAMETERS
+        )

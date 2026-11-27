@@ -35,6 +35,7 @@ from ai.backend.manager.services.vfolder_auto_mount.actions.search import (
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.update import (
     UpdateVFolderAutoMountAction,
+    UpdateVFolderAutoMountActionResult,
 )
 from ai.backend.manager.services.vfolder_auto_mount.service import VFolderAutoMountService
 
@@ -42,8 +43,9 @@ __all__ = ("VFolderAutoMountProcessors",)
 
 
 class VFolderAutoMountProcessors:
-    """The create goes through the service, whose spec carries a precondition; every
-    other operation runs against ops."""
+    """The create and the update go through the service, which rejects a reserved mount
+    destination and a subpath leading outside the vfolder; every other operation runs
+    against ops."""
 
     bulk_get_ids: PartialBulkActionProcessor[BulkGetVFolderAutoMountsAction, VFolderAutoMountData]
     create: ScopeActionProcessor[CreateVFolderAutoMountAction, CreateVFolderAutoMountActionResult]
@@ -54,7 +56,7 @@ class VFolderAutoMountProcessors:
         SearchVFolderAutoMountsAction, ScopedBatchOpsResult[VFolderAutoMountData]
     ]
     update: SingleEntityActionProcessor[
-        UpdateVFolderAutoMountAction, EntityOpsResult[VFolderAutoMountData]
+        UpdateVFolderAutoMountAction, UpdateVFolderAutoMountActionResult
     ]
     delete: SingleEntityActionProcessor[
         DeleteVFolderAutoMountAction, EntityOpsResult[VFolderAutoMountData]
@@ -73,7 +75,7 @@ class VFolderAutoMountProcessors:
         self.create = group.scope(CreateVFolderAutoMountAction, service.create)
         self.global_search = group.global_searcher_ops(GlobalSearchVFolderAutoMountsAction)
         self.search = group.scoped_search_ops(SearchVFolderAutoMountsAction)
-        self.update = group.single_update_ops(UpdateVFolderAutoMountAction)
+        self.update = group.single_entity(UpdateVFolderAutoMountAction, service.update)
         self.delete = group.single_delete_ops(DeleteVFolderAutoMountAction)
         self.restore = group.single_restore_ops(RestoreVFolderAutoMountAction)
         self.purge = group.entity_purge_ops(PurgeVFolderAutoMountAction)
