@@ -43,6 +43,8 @@ const (
 var (
 	fence      = regexp.MustCompile("^\\s*(```|~~~)")
 	codeSpan   = regexp.MustCompile("`[^`]*`")
+	quoteLine  = regexp.MustCompile(`^\s*>`)
+	quotedText = regexp.MustCompile(`"[^"]*"|“[^”]*”`)
 	hangulText = regexp.MustCompile("[" + hangulClass + "]")
 	altSplit   = regexp.MustCompile(`\s*/\s*|,\s+`)
 )
@@ -341,7 +343,8 @@ func loadWords(directory string) (english, korean []word, err error) {
 	return words[spec.English], words[spec.Korean], nil
 }
 
-// proseLines returns line number to text, without frontmatter, fenced blocks and code spans.
+// proseLines returns line number to text, without frontmatter, fenced blocks, quote blocks,
+// code spans and double-quoted text. A quote without its pair on the line is kept.
 func proseLines(text string) map[int]string {
 	lines := kdoc.SplitLines(text)
 	start := 0
@@ -355,8 +358,8 @@ func proseLines(text string) map[int]string {
 	for i := start; i < len(lines); i++ {
 		if fence.MatchString(lines[i]) {
 			fenced = !fenced
-		} else if !fenced {
-			prose[i+1] = codeSpan.ReplaceAllString(lines[i], " ")
+		} else if !fenced && !quoteLine.MatchString(lines[i]) {
+			prose[i+1] = quotedText.ReplaceAllString(codeSpan.ReplaceAllString(lines[i], " "), " ")
 		}
 	}
 	return prose

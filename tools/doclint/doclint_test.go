@@ -191,6 +191,52 @@ func TestProseLines(t *testing.T) {
 	}
 }
 
+func TestProseLinesQuotes(t *testing.T) {
+	tests := []struct {
+		name string
+		text string
+		want map[int]string
+	}{
+		{"quote block", "> quoted\nkeep\n", map[int]string{2: "keep"}},
+		{"indented quote block", "  > quoted\nkeep\n", map[int]string{2: "keep"}},
+		{"nested quote block", "> > nested\nkeep\n", map[int]string{2: "keep"}},
+		{"double quotes", `say "refuse" now`, map[int]string{1: "say   now"}},
+		{"curly quotes", "say “refuse” now", map[int]string{1: "say   now"}},
+		{"unpaired quote", `say "refuse now`, map[int]string{1: `say "refuse now`}},
+		{"unpaired curly quote", "say “refuse now", map[int]string{1: "say “refuse now"}},
+		{"quote in a code span", "say `\"` refuse `\"` now", map[int]string{1: "say   refuse   now"}},
+		{"two quoted parts", `"a" b "c"`, map[int]string{1: "  b  "}},
+		{"quote inside a fence", "```\n> q\n```\nkeep\n", map[int]string{4: "keep"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := proseLines(tt.text)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+			for n, line := range tt.want {
+				if got[n] != line {
+					t.Fatalf("line %d: got %q, want %q", n, got[n], line)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckWordsSkipsQuotes(t *testing.T) {
+	root := newRepo(t)
+	writeFile(t, root, "quoted.md", "# Q\n\n> We refuse it.\n> > We refuse it.\nSay \"we refuse\" and “we refuse”.\n")
+	writeFile(t, root, "outside.md", "# Q\n\nSay \"ok\" and we refuse it.\n")
+	out, failed := runCheck(t, root, "--only", "words", "quoted.md")
+	if failed || out != "" {
+		t.Fatalf("failed=%v out=%q", failed, out)
+	}
+	out, failed = runCheck(t, root, "--only", "words", "outside.md")
+	if !failed || out != refused("outside.md", 3) {
+		t.Fatalf("failed=%v out=%q", failed, out)
+	}
+}
+
 func TestSkippedPaths(t *testing.T) {
 	loaded, err := spec.Load(newRepo(t))
 	if err != nil {
