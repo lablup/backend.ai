@@ -220,6 +220,9 @@ class TestAppConfigFragmentPatch:
             pytest.param(
                 {"config_name": "theme", "set": [{"key": "", "value": 1}]}, id="empty-key"
             ),
+            pytest.param(
+                {"config_name": "theme", "set": [{"key": "a", "value": None}]}, id="null-value"
+            ),
         ],
     )
     def test_an_invalid_patch_is_rejected(self, body: dict[str, Any]) -> None:

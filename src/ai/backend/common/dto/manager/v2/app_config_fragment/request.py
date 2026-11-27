@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
@@ -121,8 +121,18 @@ class AppConfigFragmentEntry(BaseRequestModel):
         description=f"Added in {NEXT_RELEASE_VERSION}. Top-level key; never read as a path.",
     )
     value: Any = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. The value the key is set to, as a whole."
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. The value the key is set to, as a whole. "
+            "Never null; remove a key with `unset`."
+        ),
     )
+
+    @field_validator("value")
+    @classmethod
+    def _reject_null(cls, value: Any) -> Any:
+        if value is None:
+            raise ValueError("A value must not be null; use 'unset' to remove the key.")
+        return value
 
 
 class AppConfigFragmentPatch(BaseRequestModel):

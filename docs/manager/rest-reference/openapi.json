@@ -1490,7 +1490,7 @@
             "type": "string"
           },
           "value": {
-            "description": "Added in 26.10.0. The value the key is set to, as a whole.",
+            "description": "Added in 26.10.0. The value the key is set to, as a whole. Never null; remove a key with `unset`.",
             "title": "Value"
           }
         },
