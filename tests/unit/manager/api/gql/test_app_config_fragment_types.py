@@ -6,6 +6,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from strawberry.scalars import JSON
+
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.entity.app_config import AppConfigScopeID
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
@@ -163,7 +165,9 @@ class TestPatchAppConfigFragmentsInputGQL:
             items=[
                 AppConfigFragmentPatchGQL(
                     config_name="theme",
-                    set=[AppConfigFragmentEntryGQL(key="themeFamily", value={"a": [1]})],
+                    set=[
+                        AppConfigFragmentEntryGQL(key="themeFamily", value=cast(JSON, {"a": [1]}))
+                    ],
                     unset=["banner"],
                 )
             ],
@@ -184,7 +188,7 @@ class TestPatchAppConfigFragmentsInputGQL:
             items=[
                 AppConfigFragmentPatchGQL(
                     config_name="theme",
-                    set=[AppConfigFragmentEntryGQL(key="themeFamily", value="dark")],
+                    set=[AppConfigFragmentEntryGQL(key="themeFamily", value=cast(JSON, "dark"))],
                 )
             ]
         )
