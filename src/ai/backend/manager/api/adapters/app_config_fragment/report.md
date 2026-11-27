@@ -2,17 +2,19 @@
 
 [background](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-Scenario: incomplete 1 / 10
+Scenario: incomplete 1 / 12
 
-- built from ops (10)
+- built from ops (12)
   - admin_search: representative success ✓ · representative rejection ✓
   - batch_load_by_ids: representative success ✓ · representative rejection ✓
   - get: representative success ✓ · representative rejection ✓
   - my_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
+  - my_atomic_bulk_patch: representative success ✓ · representative rejection ✓
   - my_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
   - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
   - purge: representative success ✓ · representative rejection ✓
   - scoped_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
+  - scoped_atomic_bulk_patch: representative success ✓ · representative rejection ✓
   - scoped_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
   - scoped_search: representative success ✓ · representative rejection ✓
 
@@ -48,6 +50,14 @@ Scenario: incomplete 1 / 10
 | [even when a fragment of the user's own domain has the same name, reading the user's own fragments answers only their own. This read sees the user scope alone](#reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered) | answered |
 | [when two of the three names opened to the user scope hold the user's own fragment and a user granted read permission reads the three names, three items come back in request order and the item without a fragment is empty](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | answered |
 | [even when the user has their own fragment, a user with no permission reading by name is rejected for lack of permission](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | rejected |
+
+**my_atomic_bulk_patch**
+
+| scenario | verdict |
+|---|---|
+| [when one key is set on a name that already holds the user's own fragment, the id stays the same and only that key changes while the other keys remain](#writing-patching-one-key-of-the-own-fragment-keeps-its-other-keys) | answered |
+| [when a user with no permission sets a key on a name opened to the user kind, it is rejected for lack of permission](#writing-a-user-granted-nothing-may-not-patch-their-own-fragment) | rejected |
+| [when a user granted write permission sets a key on an unregistered name, it is rejected as write not allowed. It is the same check as a whole write](#writing-patching-a-name-nothing-registers-is-refused) | rejected |
 
 **my_atomic_bulk_upsert**
 
@@ -88,6 +98,13 @@ Scenario: incomplete 1 / 10
 | [when the superadmin reads by naming an id that belongs to no domain, it is rejected because no such target exists. Only a user who passes the permission check sees this answer](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 | [when a user granted read permission on their own domain reads by naming an id that belongs to no domain, it is rejected for lack of permission, not for a missing target](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
 | [when a user granted read permission only on their own scope reads by naming another user, it is rejected for lack of permission](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | rejected |
+
+**scoped_atomic_bulk_patch**
+
+| scenario | verdict |
+|---|---|
+| [when a user granted write permission on their own domain scope sets one key by naming the domain, only that key changes and the other keys remain](#writing-a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment) | answered |
+| [when a user who is not the superadmin, even with write permission on their own domain scope, sets a key by naming the public scope, it is rejected for lack of role](#writing-a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment) | rejected |
 
 **scoped_atomic_bulk_upsert**
 
@@ -603,6 +620,109 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### my_atomic_bulk_patch
+
+<a id="writing-patching-one-key-of-the-own-fragment-keeps-its-other-keys"></a>
+
+#### [patching-one-key-of-the-own-fragment-keeps-its-other-keys](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+when one key is set on a name that already holds the user's own fragment, the id stays the same and only that key changes while the other keys remain
+
+Given
+
+- one config name opened in the user scope with an existing fragment of their own, and one user granted the CREATE, UPDATE permission on config fragments in their own scope
+  - Domain home-1
+  - Prepare a user granted the CREATE, UPDATE permission on config fragment in their own scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role own-scope-1: applies only within the scope it is granted in
+    - Role own-scope-1: CREATE allowed on every app_config_fragment
+    - Role own-scope-1: UPDATE allowed on every app_config_fragment
+    - regular user user-1: holds Role own-scope-1
+  - Prepare a config name opened in the user scope
+    - Config definition config-1: the config of this name is registered
+    - Allow-list entry entry-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - app config fragment own-fragment-1: value {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 sets one key of their own fragment for config-1
+
+Then
+
+- every config fragment written comes back in request order
+  - items = 1
+  - items[0].id: same as the fragment that already existed
+  - items[0].config_name: same as the requested name
+  - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
+  - items[0].scope_id: same as the named owner
+  - items[0].config = {'theme': 'dark', 'menu': {'home': True}}
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+
+<a id="writing-a-user-granted-nothing-may-not-patch-their-own-fragment"></a>
+
+#### [a-user-granted-nothing-may-not-patch-their-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+when a user with no permission sets a key on a name opened to the user kind, it is rejected for lack of permission
+
+Given
+
+- one config name opened in the user scope with an existing fragment of their own, and one user with no config fragment permission
+  - Domain home-1
+  - Prepare a user with no config fragment permission
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+  - Prepare a config name opened in the user scope
+    - Config definition config-1: the config of this name is registered
+    - Allow-list entry entry-1: the config of this name can be set in the user scope, rank is the default of the scope kind
+  - app config fragment own-fragment-1: value {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 sets one key of their own fragment for config-1
+
+Then
+
+- the call is rejected
+  - rejected: NotEnoughPermission
+
+<a id="writing-patching-a-name-nothing-registers-is-refused"></a>
+
+#### [patching-a-name-nothing-registers-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+when a user granted write permission sets a key on an unregistered name, it is rejected as write not allowed. It is the same check as a whole write
+
+Given
+
+- an unregistered config name, and one user granted the CREATE, UPDATE permission on config fragments in their own scope
+  - Domain home-1
+  - Prepare a user granted the CREATE, UPDATE permission on config fragment in their own scope
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role own-scope-1: applies only within the scope it is granted in
+    - Role own-scope-1: CREATE allowed on every app_config_fragment
+    - Role own-scope-1: UPDATE allowed on every app_config_fragment
+    - regular user user-1: holds Role own-scope-1
+
+When
+
+- AppConfigFragmentAdapter.my_atomic_bulk_patch: user-1 sets one key of their own fragment for unregistered
+
+Then
+
+- the call is rejected
+  - rejected: AppConfigFragmentWriteNotAllowed
 
 ### my_atomic_bulk_upsert
 
@@ -1323,6 +1443,82 @@ Then
 
 - the call is rejected
   - rejected: NotEnoughPermission
+
+### scoped_atomic_bulk_patch
+
+<a id="writing-a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment"></a>
+
+#### [a-user-granted-write-on-the-domain-patches-one-key-of-its-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+when a user granted write permission on their own domain scope sets one key by naming the domain, only that key changes and the other keys remain
+
+Given
+
+- one config name opened in their own domain and one config fragment there, and one user granted the CREATE, UPDATE permission on config fragments in their own domain
+  - Domain home-1
+  - Prepare a config name opened in the domain scope
+    - Config definition config-1: the config of this name is registered
+    - Allow-list entry entry-1: the config of this name can be set in the domain scope, rank is the default of the scope kind
+  - Prepare a user granted the CREATE, UPDATE permission on config fragment in Domain home-1
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role seated-1: applies only within the scope it is granted in
+    - Role seated-1: CREATE allowed on every app_config_fragment
+    - Role seated-1: UPDATE allowed on every app_config_fragment
+    - regular user user-1: holds Role seated-1
+  - app config fragment fragment-1: value {'theme': 'light', 'menu': {'home': True}}
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_patch: user-1 sets one key of the fragment config-1 in the domain scope
+
+Then
+
+- every config fragment written comes back in request order
+  - items = 1
+  - items[0].id: same as the fragment that already existed
+  - items[0].config_name: same as the requested name
+  - items[0].scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
+  - items[0].scope_id: same as the named owner
+  - items[0].config = {'theme': 'dark', 'menu': {'home': True}}
+  - items[0].created_at: the time this run wrote
+  - items[0].updated_at: the time this run wrote
+
+<a id="writing-a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-patch-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
+
+when a user who is not the superadmin, even with write permission on their own domain scope, sets a key by naming the public scope, it is rejected for lack of role
+
+Given
+
+- one config name opened in the public scope, and one user granted the CREATE, UPDATE permission on config fragments in their own domain
+  - Domain home-1
+  - Prepare a config name opened in the public scope
+    - Config definition config-1: the config of this name is registered
+    - Allow-list entry entry-1: the config of this name can be set in the public scope, rank is the default of the scope kind
+  - Prepare a user granted the CREATE, UPDATE permission on config fragment in Domain home-1
+    - Prepare one user in the domain
+      - Project resource policy default: the personal project created along with a user looks it up by this name
+      - User resource policy user-policy-1: up to 10 folders per user
+      - Keypair policy keypair-policy-1: up to 5 concurrent sessions
+      - regular user user-1: has their own keypair and personal project
+    - Role seated-1: applies only within the scope it is granted in
+    - Role seated-1: CREATE allowed on every app_config_fragment
+    - Role seated-1: UPDATE allowed on every app_config_fragment
+    - regular user user-1: holds Role seated-1
+
+When
+
+- AppConfigFragmentAdapter.scoped_atomic_bulk_patch: user-1 sets one key of the fragment config-1 in the public scope
+
+Then
+
+- the call is rejected
+  - rejected: InsufficientPrivilege
 
 ### scoped_atomic_bulk_upsert
 
