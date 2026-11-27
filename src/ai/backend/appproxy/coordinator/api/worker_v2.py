@@ -307,7 +307,12 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         return result
 
     async with root_ctx.db.connect() as db_conn:
-        result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
+        # Under SERIALIZABLE, a heartbeat of another worker whose commit waits on a slow
+        # WAL flush makes this one fail on every retry.
+        read_committed_conn = await db_conn.execution_options(isolation_level="READ COMMITTED")
+        result = await execute_with_txn_retry(
+            _update, root_ctx.db.begin_session, read_committed_conn
+        )
     request["do_not_print_access_log"] = True
     return PydanticResponse(WorkerResponseModel(**result))
 
