@@ -793,8 +793,9 @@ Then
   - [0].field_id: 미리 저장한 정책의 id 와 같다
   - [0].deployment_id: 정책이 걸린 배포의 id 와 같다
   - [0].strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
-  - [0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - [0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - [0].strategy_spec.blue_green = None
+  - [0].strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - [0].strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - [0].created_at: 이 실행이 쓴 시각
   - [0].updated_at: 이 실행이 쓴 시각
 
@@ -1595,8 +1596,9 @@ Then
   - items[0].field_id: 미리 저장한 정책의 id 와 같다
   - items[0].deployment_id: 정책이 걸린 배포의 id 와 같다
   - items[0].strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
-  - items[0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - items[0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - items[0].strategy_spec.blue_green = None
+  - items[0].strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - items[0].strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
 
@@ -3632,8 +3634,9 @@ Then
   - field_id: 미리 저장한 정책의 id 와 같다
   - deployment_id: 정책이 걸린 배포의 id 와 같다
   - strategy_spec.strategy: 미리 저장한 정책의 전략와 같다
-  - strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - strategy_spec.blue_green = None
+  - strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
@@ -5251,8 +5254,9 @@ Then
   - field_id: 건너뜀: the database generates it
   - deployment_id: 정책을 올린 배포의 id 와 같다
   - strategy_spec.strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - strategy_spec.max_surge = IntOrPercent(count=None, percent=0.5)
-  - strategy_spec.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - strategy_spec.rolling_update.max_surge = IntOrPercent(count=None, percent=0.5)
+  - strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - strategy_spec.blue_green = None
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 

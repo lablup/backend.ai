@@ -272,22 +272,6 @@ class PydanticInputMixin[T_DTO: BaseModel]:
         return cast(T_DTO, dto_cls(**kwargs))
 
 
-def _convert_to_implementor(field_type: type, value: BaseModel) -> Any | None:
-    """Convert ``value`` with the implementor of interface ``field_type`` built from its DTO type.
-
-    The interface's own ``from_pydantic`` builds the interface, which GraphQL cannot resolve.
-    """
-    implementor = getattr(type(value), "_strawberry_type", None)
-    if isinstance(implementor, type) and issubclass(implementor, field_type):
-        return cast(Any, implementor).from_pydantic(value)
-    return None
-
-
-def _is_interface(field_type: type) -> bool:
-    definition = getattr(field_type, "__strawberry_definition__", None)
-    return definition is not None and definition.is_interface
-
-
 def _convert_value(value: Any, type_hint: Any) -> Any:
     """Convert a single value from Pydantic domain to Strawberry domain."""
     if value is None:
@@ -330,10 +314,6 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
             and isinstance(field_type, type)
             and hasattr(field_type, "from_pydantic")
         ):
-            if _is_interface(field_type):
-                converted = _convert_to_implementor(field_type, value)
-                if converted is not None:
-                    return converted
             return field_type.from_pydantic(value)
         return value
 
@@ -347,11 +327,6 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
                 and isinstance(item_type, type)
                 and hasattr(item_type, "from_pydantic")
             ):
-                if _is_interface(item_type):
-                    return [
-                        _convert_to_implementor(item_type, item) or item_type.from_pydantic(item)
-                        for item in value
-                    ]
                 return [item_type.from_pydantic(item) for item in value]
         elif item_type is not None and isinstance(item_type, type) and issubclass(item_type, Enum):
             # list[Enum] or list[str/int] → list[GQL enum]

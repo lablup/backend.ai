@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     EmailMessageInfo,
     EmailSpecInfo,
     NotificationChannelOrderField,
+    NotificationChannelSpecInfo,
     NotificationChannelTypeDTO,
     NotificationRuleOrderField,
     NotificationRuleTypeDTO,
@@ -161,21 +162,18 @@ class TestWebhookSpecInfo:
 
     def test_creation_with_url(self) -> None:
         info = WebhookSpecInfo(
-            channel_type=NotificationChannelTypeDTO.WEBHOOK,
             url="https://example.com/webhook",
         )
         assert info.url == "https://example.com/webhook"
 
     def test_creation_from_dict(self) -> None:
         info = WebhookSpecInfo.model_validate({
-            "channel_type": "webhook",
             "url": "https://hooks.example.com",
         })
         assert info.url == "https://hooks.example.com"
 
     def test_model_dump_json(self) -> None:
         info = WebhookSpecInfo(
-            channel_type=NotificationChannelTypeDTO.WEBHOOK,
             url="https://example.com/hook",
         )
         parsed = json.loads(info.model_dump_json())
@@ -183,7 +181,6 @@ class TestWebhookSpecInfo:
 
     def test_round_trip_serialization(self) -> None:
         info = WebhookSpecInfo(
-            channel_type=NotificationChannelTypeDTO.WEBHOOK,
             url="https://example.com/hook",
         )
         json_str = info.model_dump_json()
@@ -206,7 +203,6 @@ class TestEmailSpecInfo:
             to_emails=["admin@example.com", "ops@example.com"],
         )
         info = EmailSpecInfo(
-            channel_type=NotificationChannelTypeDTO.EMAIL,
             smtp=smtp,
             message=message,
         )
@@ -219,7 +215,6 @@ class TestEmailSpecInfo:
 
     def test_creation_from_dict(self) -> None:
         info = EmailSpecInfo.model_validate({
-            "channel_type": "email",
             "smtp": {
                 "host": "mail.example.com",
                 "port": 465,
@@ -241,7 +236,6 @@ class TestEmailSpecInfo:
             to_emails=["admin@example.com"],
         )
         info = EmailSpecInfo(
-            channel_type=NotificationChannelTypeDTO.EMAIL,
             smtp=smtp,
             message=message,
         )
@@ -259,7 +253,6 @@ class TestEmailSpecInfo:
             to_emails=["a@example.com", "b@example.com"],
         )
         info = EmailSpecInfo(
-            channel_type=NotificationChannelTypeDTO.EMAIL,
             smtp=smtp,
             message=message,
         )
@@ -271,7 +264,6 @@ class TestEmailSpecInfo:
         smtp = SMTPConnectionInfo(host="smtp.example.com", port=587, use_tls=True, timeout=30)
         message = EmailMessageInfo(from_email="from@example.com", to_emails=["to@example.com"])
         info = EmailSpecInfo(
-            channel_type=NotificationChannelTypeDTO.EMAIL,
             smtp=smtp,
             message=message,
         )
@@ -282,10 +274,42 @@ class TestEmailSpecInfo:
         message = EmailMessageInfo(from_email="from@example.com", to_emails=["to@example.com"])
         auth = SMTPAuthInfo(username="user@example.com")
         info = EmailSpecInfo(
-            channel_type=NotificationChannelTypeDTO.EMAIL,
             smtp=smtp,
             message=message,
             auth=auth,
         )
         assert info.auth is not None
         assert info.auth.username == "user@example.com"
+
+
+class TestNotificationChannelSpecInfo:
+    """Tests for the oneOf-shaped NotificationChannelSpecInfo container."""
+
+    def test_a_webhook_spec_leaves_email_unset(self) -> None:
+        info = NotificationChannelSpecInfo(
+            channel_type=NotificationChannelTypeDTO.WEBHOOK,
+            webhook=WebhookSpecInfo(url="https://example.com/hook"),
+        )
+        parsed = json.loads(info.model_dump_json())
+        assert parsed == {
+            "channel_type": "webhook",
+            "webhook": {"url": "https://example.com/hook"},
+            "email": None,
+        }
+
+    def test_an_email_spec_round_trips(self) -> None:
+        info = NotificationChannelSpecInfo(
+            channel_type=NotificationChannelTypeDTO.EMAIL,
+            email=EmailSpecInfo(
+                smtp=SMTPConnectionInfo(
+                    host="smtp.example.com", port=587, use_tls=True, timeout=30
+                ),
+                message=EmailMessageInfo(
+                    from_email="from@example.com", to_emails=["to@example.com"]
+                ),
+            ),
+        )
+        restored = NotificationChannelSpecInfo.model_validate_json(info.model_dump_json())
+        assert restored.webhook is None
+        assert restored.email is not None
+        assert restored.email.smtp.host == "smtp.example.com"

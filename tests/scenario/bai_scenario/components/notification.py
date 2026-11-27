@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
+    NotificationChannelSpecInfo,
     NotificationChannelTypeDTO,
     WebhookSpecInfo,
 )
@@ -376,34 +377,50 @@ def _channel_seed(
 # ------------------------------------------------------------------ verdicts
 
 
-def webhook_spec_verdicts(prefix: str, spec: object, *, url: str) -> list[Verdict]:
-    if not isinstance(spec, WebhookSpecInfo):
-        return [Same(f"{prefix}spec", type(spec).__name__, WebhookSpecInfo.__name__)]
-    return [
+def webhook_spec_verdicts(
+    prefix: str, spec: NotificationChannelSpecInfo, *, url: str
+) -> list[Verdict]:
+    verdicts: list[Verdict] = [
         Same(f"{prefix}spec.channel_type", spec.channel_type, NotificationChannelTypeDTO.WEBHOOK),
-        Same(f"{prefix}spec.url", spec.url, url),
+        Same(f"{prefix}spec.email", spec.email, None),
     ]
+    webhook = spec.webhook
+    if webhook is None:
+        return [
+            *verdicts,
+            Same(f"{prefix}spec.webhook", type(webhook).__name__, WebhookSpecInfo.__name__),
+        ]
+    return [*verdicts, Same(f"{prefix}spec.webhook.url", webhook.url, url)]
 
 
-def email_spec_verdicts(prefix: str, spec: object) -> list[Verdict]:
-    if not isinstance(spec, EmailSpecInfo):
-        return [Same(f"{prefix}spec", type(spec).__name__, EmailSpecInfo.__name__)]
-    return [
+def email_spec_verdicts(prefix: str, spec: NotificationChannelSpecInfo) -> list[Verdict]:
+    verdicts: list[Verdict] = [
         Same(f"{prefix}spec.channel_type", spec.channel_type, NotificationChannelTypeDTO.EMAIL),
-        Same(f"{prefix}spec.smtp.host", spec.smtp.host, SMTP_HOST),
-        Same(f"{prefix}spec.smtp.port", spec.smtp.port, SMTP_PORT),
-        Same(f"{prefix}spec.smtp.use_tls", spec.smtp.use_tls, True),
-        Same(f"{prefix}spec.smtp.timeout", spec.smtp.timeout, 30),
-        Same(f"{prefix}spec.message.from_email", spec.message.from_email, FROM_EMAIL),
-        Same(f"{prefix}spec.message.to_emails", spec.message.to_emails, [TO_EMAIL]),
-        Same(f"{prefix}spec.message.subject_template", spec.message.subject_template, None),
+        Same(f"{prefix}spec.webhook", spec.webhook, None),
+    ]
+    email = spec.email
+    if email is None:
+        return [
+            *verdicts,
+            Same(f"{prefix}spec.email", type(email).__name__, EmailSpecInfo.__name__),
+        ]
+    at = f"{prefix}spec.email"
+    return [
+        *verdicts,
+        Same(f"{at}.smtp.host", email.smtp.host, SMTP_HOST),
+        Same(f"{at}.smtp.port", email.smtp.port, SMTP_PORT),
+        Same(f"{at}.smtp.use_tls", email.smtp.use_tls, True),
+        Same(f"{at}.smtp.timeout", email.smtp.timeout, 30),
+        Same(f"{at}.message.from_email", email.message.from_email, FROM_EMAIL),
+        Same(f"{at}.message.to_emails", email.message.to_emails, [TO_EMAIL]),
+        Same(f"{at}.message.subject_template", email.message.subject_template, None),
         Same(
-            f"{prefix}spec.auth.username",
-            spec.auth.username if spec.auth is not None else None,
+            f"{at}.auth.username",
+            email.auth.username if email.auth is not None else None,
             SMTP_USERNAME,
         ),
         Skipped(
-            f"{prefix}spec.auth.password",
+            f"{at}.auth.password",
             Says("응답 타입에 그 자리가 없습니다", english="the response type has no such place"),
         ),
     ]

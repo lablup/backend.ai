@@ -793,8 +793,9 @@ Then
   - [0].field_id: same as the id of the policy seeded in advance
   - [0].deployment_id: same as the id of the deployment the policy sets
   - [0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
-  - [0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - [0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - [0].strategy_spec.blue_green = None
+  - [0].strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - [0].strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - [0].created_at: the time this run wrote
   - [0].updated_at: the time this run wrote
 
@@ -1595,8 +1596,9 @@ Then
   - items[0].field_id: same as the id of the policy seeded in advance
   - items[0].deployment_id: same as the id of the deployment the policy sets
   - items[0].strategy_spec.strategy: same as the strategy of the policy seeded in advance
-  - items[0].strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - items[0].strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - items[0].strategy_spec.blue_green = None
+  - items[0].strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - items[0].strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - items[0].created_at: the time this run wrote
   - items[0].updated_at: the time this run wrote
 
@@ -3632,8 +3634,9 @@ Then
   - field_id: same as the id of the policy seeded in advance
   - deployment_id: same as the id of the deployment the policy sets
   - strategy_spec.strategy: same as the strategy of the policy seeded in advance
-  - strategy_spec.max_surge = IntOrPercent(count=1, percent=None)
-  - strategy_spec.max_unavailable = IntOrPercent(count=0, percent=None)
+  - strategy_spec.blue_green = None
+  - strategy_spec.rolling_update.max_surge = IntOrPercent(count=1, percent=None)
+  - strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=0, percent=None)
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 
@@ -5251,8 +5254,9 @@ Then
   - field_id: skipped: the database generates it
   - deployment_id: same as the id of the deployment the policy was put on
   - strategy_spec.strategy = <DeploymentStrategy.ROLLING: 'ROLLING'>
-  - strategy_spec.max_surge = IntOrPercent(count=None, percent=0.5)
-  - strategy_spec.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - strategy_spec.rolling_update.max_surge = IntOrPercent(count=None, percent=0.5)
+  - strategy_spec.rolling_update.max_unavailable = IntOrPercent(count=None, percent=0.0)
+  - strategy_spec.blue_green = None
   - created_at: the time this run wrote
   - updated_at: the time this run wrote
 

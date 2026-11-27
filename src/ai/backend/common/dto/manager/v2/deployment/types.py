@@ -183,29 +183,30 @@ class DeploymentPolicyInfo(BaseResponseModel):
     blue_green: BlueGreenConfigInfo | None
 
 
-class DeploymentStrategySpecInfo(BaseResponseModel):
-    """Base class for deployment strategy spec sub-types.
-
-    Subclassed by RollingUpdateStrategySpecInfo and BlueGreenStrategySpecInfo so
-    that Strawberry's pydantic interface dispatch can resolve the concrete GQL
-    type from the concrete DTO type via DeploymentStrategySpecGQL.from_pydantic().
-    """
-
-    strategy: DeploymentStrategy
-
-
-class RollingUpdateStrategySpecInfo(DeploymentStrategySpecInfo):
+class RollingUpdateStrategySpecInfo(BaseResponseModel):
     """Rolling update strategy spec — matches RollingUpdateStrategySpecGQL structure."""
 
     max_surge: IntOrPercent
     max_unavailable: IntOrPercent
 
 
-class BlueGreenStrategySpecInfo(DeploymentStrategySpecInfo):
+class BlueGreenStrategySpecInfo(BaseResponseModel):
     """Blue-green strategy spec — matches BlueGreenStrategySpecGQL structure."""
 
     auto_promote: bool
     promote_delay_seconds: int
+
+
+class DeploymentStrategySpecInfo(BaseResponseModel):
+    """Deployment strategy spec: ``strategy`` names the one sub-spec that is set.
+
+    Exactly one of ``rolling_update`` or ``blue_green`` is non-null, the one matching
+    ``strategy``.
+    """
+
+    strategy: DeploymentStrategy
+    rolling_update: RollingUpdateStrategySpecInfo | None = None
+    blue_green: BlueGreenStrategySpecInfo | None = None
 
 
 class AccessTokenOrderField(StrEnum):

@@ -2164,8 +2164,7 @@ input BlueGreenConfigInput {
 }
 
 """Added in 26.10.0. Blue-green deployment strategy specification."""
-type BlueGreenStrategySpec implements DeploymentStrategySpec {
-  strategy: DeploymentStrategyType!
+type BlueGreenStrategySpec {
   autoPromote: Boolean!
   promoteDelaySeconds: Int!
 }
@@ -5595,10 +5594,20 @@ input DeploymentStrategyInput {
 }
 
 """
-Added in 25.19.0. Base interface for deployment strategy specifications.
+Added in 25.19.0. Deployment strategy specification. Exactly one of 'rollingUpdate' or 'blueGreen' is non-null, the one matching 'strategy'.
 """
-interface DeploymentStrategySpec {
+type DeploymentStrategySpec {
   strategy: DeploymentStrategyType!
+
+  """
+  Added in 26.10.0. Rolling update settings. Non-null for the ROLLING strategy.
+  """
+  rollingUpdate: RollingUpdateStrategySpec
+
+  """
+  Added in 26.10.0. Blue-green settings. Non-null for the BLUE_GREEN strategy.
+  """
+  blueGreen: BlueGreenStrategySpec
 }
 
 """
@@ -6224,10 +6233,7 @@ input EmailMessageInput {
 }
 
 """Added in 26.10.0. Specification for email notification channel."""
-type EmailSpec implements NotificationChannelSpec {
-  """Channel type discriminator"""
-  channelType: NotificationChannelType!
-
+type EmailSpec {
   """SMTP connection settings"""
   smtp: SMTPConnection!
 
@@ -12277,10 +12283,20 @@ enum NotificationChannelOrderField {
   UPDATED_AT
 }
 
-"""Added in 26.3.0. Interface for notification channel specifications."""
-interface NotificationChannelSpec {
+"""
+Added in 26.3.0. Notification channel specification. Exactly one of 'webhook' or 'email' is non-null, the one matching 'channelType'.
+"""
+type NotificationChannelSpec {
   """Channel type discriminator"""
   channelType: NotificationChannelType!
+
+  """
+  Added in 26.10.0. Webhook specification. Non-null for a webhook channel.
+  """
+  webhook: WebhookSpec
+
+  """Added in 26.10.0. Email specification. Non-null for an email channel."""
+  email: EmailSpec
 }
 
 """
@@ -19426,8 +19442,7 @@ input RollingUpdateConfigInput {
 }
 
 """Added in 26.10.0. Rolling update strategy specification."""
-type RollingUpdateStrategySpec implements DeploymentStrategySpec {
-  strategy: DeploymentStrategyType!
+type RollingUpdateStrategySpec {
   maxSurge: IntOrPercent!
   maxUnavailable: IntOrPercent!
 }
@@ -25607,10 +25622,7 @@ extend type VirtualFolderNode implements Node @key(fields: "id") {
 }
 
 """Added in 26.10.0. Specification for webhook notification channel."""
-type WebhookSpec implements NotificationChannelSpec {
-  """Channel type discriminator"""
-  channelType: NotificationChannelType!
-
+type WebhookSpec {
   """Webhook endpoint URL"""
   url: String!
 }

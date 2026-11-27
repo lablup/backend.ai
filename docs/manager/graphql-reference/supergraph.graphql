@@ -2858,11 +2858,9 @@ input BlueGreenConfigInput
 }
 
 """Added in 26.10.0. Blue-green deployment strategy specification."""
-type BlueGreenStrategySpec implements DeploymentStrategySpec
-  @join__implements(graph: STRAWBERRY, interface: "DeploymentStrategySpec")
+type BlueGreenStrategySpec
   @join__type(graph: STRAWBERRY)
 {
-  strategy: DeploymentStrategyType!
   autoPromote: Boolean!
   promoteDelaySeconds: Int!
 }
@@ -7607,12 +7605,22 @@ input DeploymentStrategyInput
 }
 
 """
-Added in 25.19.0. Base interface for deployment strategy specifications.
+Added in 25.19.0. Deployment strategy specification. Exactly one of 'rollingUpdate' or 'blueGreen' is non-null, the one matching 'strategy'.
 """
-interface DeploymentStrategySpec
+type DeploymentStrategySpec
   @join__type(graph: STRAWBERRY)
 {
   strategy: DeploymentStrategyType!
+
+  """
+  Added in 26.10.0. Rolling update settings. Non-null for the ROLLING strategy.
+  """
+  rollingUpdate: RollingUpdateStrategySpec
+
+  """
+  Added in 26.10.0. Blue-green settings. Non-null for the BLUE_GREEN strategy.
+  """
+  blueGreen: BlueGreenStrategySpec
 }
 
 """
@@ -8546,13 +8554,9 @@ input EmailMessageInput
 }
 
 """Added in 26.10.0. Specification for email notification channel."""
-type EmailSpec implements NotificationChannelSpec
-  @join__implements(graph: STRAWBERRY, interface: "NotificationChannelSpec")
+type EmailSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Channel type discriminator"""
-  channelType: NotificationChannelType!
-
   """SMTP connection settings"""
   smtp: SMTPConnection!
 
@@ -16901,12 +16905,22 @@ enum NotificationChannelOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.3.0. Interface for notification channel specifications."""
-interface NotificationChannelSpec
+"""
+Added in 26.3.0. Notification channel specification. Exactly one of 'webhook' or 'email' is non-null, the one matching 'channelType'.
+"""
+type NotificationChannelSpec
   @join__type(graph: STRAWBERRY)
 {
   """Channel type discriminator"""
   channelType: NotificationChannelType!
+
+  """
+  Added in 26.10.0. Webhook specification. Non-null for a webhook channel.
+  """
+  webhook: WebhookSpec
+
+  """Added in 26.10.0. Email specification. Non-null for an email channel."""
+  email: EmailSpec
 }
 
 """
@@ -25606,11 +25620,9 @@ input RollingUpdateConfigInput
 }
 
 """Added in 26.10.0. Rolling update strategy specification."""
-type RollingUpdateStrategySpec implements DeploymentStrategySpec
-  @join__implements(graph: STRAWBERRY, interface: "DeploymentStrategySpec")
+type RollingUpdateStrategySpec
   @join__type(graph: STRAWBERRY)
 {
-  strategy: DeploymentStrategyType!
   maxSurge: IntOrPercent!
   maxUnavailable: IntOrPercent!
 }
@@ -33307,13 +33319,9 @@ type VirtualFolderPermissionList implements PaginatedList
 }
 
 """Added in 26.10.0. Specification for webhook notification channel."""
-type WebhookSpec implements NotificationChannelSpec
-  @join__implements(graph: STRAWBERRY, interface: "NotificationChannelSpec")
+type WebhookSpec
   @join__type(graph: STRAWBERRY)
 {
-  """Channel type discriminator"""
-  channelType: NotificationChannelType!
-
   """Webhook endpoint URL"""
   url: String!
 }

@@ -13,7 +13,6 @@ from uuid import UUID
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.deployment.response import DeploymentPolicyNode
-from ai.backend.common.dto.manager.v2.deployment.types import BlueGreenStrategySpecInfo
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -54,26 +53,38 @@ class ThePolicyNode:
                 SameAs(laid.strategy, STRATEGY),
             )
         ]
-        if isinstance(spec, BlueGreenStrategySpecInfo):
+        if spec.blue_green is not None:
             bg = _as_bg(laid)
             spec_verdicts += [
-                Same(f"{at}strategy_spec.auto_promote", spec.auto_promote, bg.auto_promote),
+                Same(f"{at}strategy_spec.rolling_update", spec.rolling_update, None),
                 Same(
-                    f"{at}strategy_spec.promote_delay_seconds",
-                    spec.promote_delay_seconds,
+                    f"{at}strategy_spec.blue_green.auto_promote",
+                    spec.blue_green.auto_promote,
+                    bg.auto_promote,
+                ),
+                Same(
+                    f"{at}strategy_spec.blue_green.promote_delay_seconds",
+                    spec.blue_green.promote_delay_seconds,
                     bg.promote_delay_seconds,
                 ),
             ]
-        else:
+        elif spec.rolling_update is not None:
             rolling = _as_rolling(laid)
             spec_verdicts += [
-                Same(f"{at}strategy_spec.max_surge", spec.max_surge, rolling.max_surge),
+                Same(f"{at}strategy_spec.blue_green", spec.blue_green, None),
                 Same(
-                    f"{at}strategy_spec.max_unavailable",
-                    spec.max_unavailable,
+                    f"{at}strategy_spec.rolling_update.max_surge",
+                    spec.rolling_update.max_surge,
+                    rolling.max_surge,
+                ),
+                Same(
+                    f"{at}strategy_spec.rolling_update.max_unavailable",
+                    spec.rolling_update.max_unavailable,
                     rolling.max_unavailable,
                 ),
             ]
+        else:
+            spec_verdicts.append(Same(f"{at}strategy_spec", "neither sub-spec", "one sub-spec set"))
         return [
             Held[UUID](f"{at}id", node.id, SameAs(laid.id, POLICY_ID)),
             Held[UUID](f"{at}field_id", node.field_id, SameAs(laid.id, POLICY_ID)),
